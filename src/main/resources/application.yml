@@ -1,0 +1,23 @@
+spring:
+  main:
+    lazy-initialization: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+    mongodb:
+      host: localhost
+      port: 27017
+      database: hello-crdt
+
+server:
+  compression:
+    enabled: true
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: prometheus
+      base-path: /actuator

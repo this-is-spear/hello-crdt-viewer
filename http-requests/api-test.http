@@ -1,0 +1,6 @@
+### 1. 문서 생성 (POST /docs)
+POST http://localhost:8080/docs?title=newdocs
+
+### 3. 문서 조회 (GET /docs/{id}) - 문서 ID는 실제 생성된 ID로 변경 필요
+GET http://localhost:8080/docs/66548b90-4032-4ecc-808b-f60a361021f1
+

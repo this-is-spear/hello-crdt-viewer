@@ -11,19 +11,24 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api")
 class DocumentController(
-    private val readMyDocumentService: ReadMyDocumentService,
+    private val myDocumentService: MyDocumentService,
 ) {
     @GetMapping("/documents/{id}")
     fun viewDocs(
         @PathVariable id: String,
     ): MyDocument {
-        return readMyDocumentService.readDocument(id) ?: throw IllegalArgumentException("Document not found")
+        return myDocumentService.readDocument(id) ?: throw IllegalArgumentException("Document not found")
     }
 
     @PostMapping("/documents")
     fun createDocs(
         @RequestBody request: CreateDocumentRequest,
     ): MyDocument {
-        return readMyDocumentService.createDocument(request.title)
+        return myDocumentService.createDocument(request.title)
+    }
+
+    @GetMapping("/documents")
+    fun getDocs(): List<MyDocumentMetadata> {
+        return myDocumentService.getDocuments()
     }
 }

@@ -1,27 +1,25 @@
 package hello.tis.hello_crdt_viewer.crdt
 
-import hello.tis.hello_crdt_viewer.domain.DocumentSequence
 import hello.tis.hello_crdt_viewer.domain.Sentence
+import hello.tis.hello_crdt_viewer.domain.SequenceCreator
 import org.springframework.messaging.handler.annotation.MessageMapping
 import org.springframework.messaging.handler.annotation.Payload
-import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.stereotype.Controller
 
 @Controller
 class CrdtController(
-    private val sequenceCreatorService: SequenceCreatorService,
-    private val simpMessagingTemplate: SimpMessagingTemplate,
+    private val sequenceCreator: SequenceCreator,
+    private val redisMessagePublisher: RedisMessagePublisher
 ) {
     @MessageMapping("/sentence/publish")
     fun publishSentence(@Payload sentenceRequest: SentenceRequest) {
-        val now = sequenceCreatorService.getNowTime()
-        val documentSequence = DocumentSequence.create(now)
+        val documentSequence = sequenceCreator.getNowTime()
         val processedSentence = Sentence(
             id = sentenceRequest.id,
             prevId = sentenceRequest.prevId,
             rootDocumentId = sentenceRequest.rootDocumentId,
             content = sentenceRequest.content,
-            sequence = documentSequence.sequence,
+            sequence = documentSequence,
         )
 
         val processedSentenceResponse = SentenceResponse(
@@ -32,9 +30,11 @@ class CrdtController(
             sequence = processedSentence.sequence,
             sessionId = sentenceRequest.sessionId,
         )
-        
+
         // Publish to all subscribers of this document
-        val topic = "/topic/document/${sentenceRequest.rootDocumentId}"
-        simpMessagingTemplate.convertAndSend(topic, processedSentenceResponse)
+        redisMessagePublisher.publishToDocument(
+            sentenceRequest.rootDocumentId,
+            processedSentenceResponse
+        )
     }
 }
