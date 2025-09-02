@@ -69,23 +69,51 @@
             position: relative;
         }
         
-        .sentence-line.mouse-focus {
+        .sentence-line.watch-focus {
             border-color: #007bff;
             background-color: #f8f9fa;
+            transition: all 0.2s ease-in-out;
         }
         
         .sentence-line.input-focus {
-            border-color: #007bff;
+            border-color: #0056b3;
+            border-width: 3px;
             background-color: white;
+            transition: all 0.15s ease-in-out;
         }
         
         .sentence-line.input-focus:hover {
-            border-color: #007bff;
+            border-color: #0056b3;
             background-color: white;
         }
         
         .sentence-line.empty {
             color: #999;
+        }
+        
+        /* Enhanced visual focus indicators for accessibility */
+        .sentence-line:focus-visible,
+        .sentence-line.watch-focus {
+            outline: 2px solid #007bff;
+            outline-offset: 2px;
+        }
+        
+        .sentence-line.input-focus {
+            outline: 3px solid #0056b3;
+            outline-offset: 2px;
+        }
+        
+        /* Screen reader announcements */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
         }
         
         
@@ -145,6 +173,9 @@
             현재 문서: <span id="currentDocument">없음</span> |
             세션 ID: <span id="sessionId"></span>
         </div>
+        
+        <!-- Screen reader announcements -->
+        <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
     </div>
 
     <script>
@@ -356,50 +387,231 @@
             editor.appendChild(wrapper);
         }
         
-        // Focus state management functions
+        // Three-State Focus System
+        const FocusState = {
+            NO_FOCUS: 'no-focus',
+            WATCH_FOCUS: 'watch-focus', 
+            INPUT_FOCUS: 'input-focus'
+        };
+        
+        let currentFocusState = FocusState.NO_FOCUS;
+        let currentFocusedElement = null;
+        let savedCursorPosition = 0;
+        
+        // Global keyboard event handler
+        document.addEventListener('keydown', handleGlobalKeydown);
+        
+        function handleGlobalKeydown(e) {
+            switch(currentFocusState) {
+                case FocusState.NO_FOCUS:
+                    handleNoFocusKeys(e);
+                    break;
+                case FocusState.WATCH_FOCUS:
+                    handleWatchFocusKeys(e);
+                    break;
+                case FocusState.INPUT_FOCUS:
+                    handleInputFocusKeys(e);
+                    break;
+            }
+        }
+        
+        function handleNoFocusKeys(e) {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                transitionToWatchFocus(getFirstSentence());
+            }
+        }
+        
+        function handleWatchFocusKeys(e) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateWatchFocus('up');
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateWatchFocus('down');
+            } else if (e.key === 'Enter' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                transitionToInputFocus(currentFocusedElement);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                transitionToNoFocus();
+            }
+        }
+        
+        function handleInputFocusKeys(e) {
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                navigateInputFocus('up');
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                navigateInputFocus('down');
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                transitionToWatchFocus(currentFocusedElement);
+            }
+        }
+        
+        function transitionToNoFocus() {
+            clearAllFocusStates();
+            currentFocusState = FocusState.NO_FOCUS;
+            currentFocusedElement = null;
+            updateAccessibility();
+        }
+        
+        function transitionToWatchFocus(element) {
+            if (!element) return;
+            clearAllFocusStates();
+            element.classList.add('watch-focus');
+            currentFocusState = FocusState.WATCH_FOCUS;
+            currentFocusedElement = element;
+            updateAccessibility();
+        }
+        
+        function transitionToInputFocus(element, cursorPosition = null) {
+            if (!element) return;
+            clearAllFocusStates();
+            element.classList.add('input-focus');
+            currentFocusState = FocusState.INPUT_FOCUS;
+            currentFocusedElement = element;
+            editSentence(element, cursorPosition);
+            updateAccessibility();
+        }
+        
+        function navigateWatchFocus(direction) {
+            if (!currentFocusedElement) return;
+            
+            const targetElement = getAdjacentSentence(currentFocusedElement, direction);
+            if (targetElement) {
+                transitionToWatchFocus(targetElement);
+            }
+        }
+        
+        function navigateInputFocus(direction) {
+            if (!currentFocusedElement) return;
+            
+            // Save cursor position
+            const textarea = currentFocusedElement.querySelector('.sentence-input');
+            if (textarea) {
+                savedCursorPosition = textarea.selectionStart;
+                // Save without exiting focus state
+                saveCurrentSentenceContent(currentFocusedElement, textarea);
+            }
+            
+            // Navigate to adjacent sentence
+            const targetElement = getAdjacentSentence(currentFocusedElement, direction);
+            if (targetElement) {
+                // Directly transition to InputFocus with saved cursor position
+                transitionToInputFocus(targetElement, savedCursorPosition);
+            }
+        }
+        
+        function getFirstSentence() {
+            return document.querySelector('.sentence-line');
+        }
+        
+        function getAdjacentSentence(element, direction) {
+            const currentWrapper = element.closest('.sentence-wrapper');
+            let targetWrapper;
+            
+            if (direction === 'up') {
+                targetWrapper = currentWrapper.previousElementSibling;
+            } else {
+                targetWrapper = currentWrapper.nextElementSibling;
+            }
+            
+            return targetWrapper ? targetWrapper.querySelector('.sentence-line') : null;
+        }
+        
+        function clearAllFocusStates() {
+            document.querySelectorAll('.sentence-line').forEach(el => {
+                el.classList.remove('watch-focus', 'input-focus');
+                // Clear any inline background styles that might cause ghosting
+                el.style.backgroundColor = '';
+                
+                // Remove any existing input forms and restore content
+                const textarea = el.querySelector('.sentence-input');
+                if (textarea) {
+                    const content = textarea.value;
+                    el.innerHTML = '';
+                    
+                    if (content.trim() === '') {
+                        el.classList.add('empty');
+                    } else {
+                        el.classList.remove('empty');
+                        el.textContent = content;
+                    }
+                }
+            });
+        }
+        
+        function updateAccessibility() {
+            const announcements = document.getElementById('sr-announcements');
+            
+            if (currentFocusedElement) {
+                switch(currentFocusState) {
+                    case FocusState.WATCH_FOCUS:
+                        currentFocusedElement.setAttribute('aria-label', '선택된 문장, Enter 또는 왼쪽 화살표로 편집, 위/아래 화살표로 이동, ESC로 포커스 해제');
+                        currentFocusedElement.setAttribute('tabindex', '0');
+                        announceToScreenReader('네비게이션 모드: 문장을 선택했습니다. Enter 키로 편집하거나 화살표 키로 이동하세요.');
+                        break;
+                    case FocusState.INPUT_FOCUS:
+                        currentFocusedElement.setAttribute('aria-label', '편집 중인 문장, 위/아래 화살표로 문장 이동, ESC로 네비게이션 모드');
+                        announceToScreenReader('편집 모드: 문장을 편집하고 있습니다. ESC 키로 네비게이션 모드로 돌아가세요.');
+                        break;
+                    case FocusState.NO_FOCUS:
+                        announceToScreenReader('포커스가 해제되었습니다. 위/아래 화살표 키를 눌러 네비게이션을 시작하세요.');
+                        break;
+                }
+            }
+            
+            // Clear tabindex from non-focused elements
+            document.querySelectorAll('.sentence-line').forEach(el => {
+                if (el !== currentFocusedElement) {
+                    el.removeAttribute('tabindex');
+                }
+            });
+        }
+        
+        function announceToScreenReader(message) {
+            const announcements = document.getElementById('sr-announcements');
+            if (announcements) {
+                announcements.textContent = message;
+                // Clear after a delay to allow screen readers to announce
+                setTimeout(() => {
+                    announcements.textContent = '';
+                }, 1000);
+            }
+        }
+        
+        // Mouse compatibility functions (kept for backward compatibility)
         function handleMouseEnter(element) {
-            // NoFocus → MouseFocus: Only if not in input focus and no other element has input focus
-            if (!element.classList.contains('input-focus') && !document.querySelector('.sentence-line.input-focus')) {
-                element.classList.add('mouse-focus');
+            // Only show hover effect if not in any focus state
+            if (currentFocusState === FocusState.NO_FOCUS) {
+                element.style.backgroundColor = '#f8f9fa';
             }
         }
         
         function handleMouseLeave(element) {
-            // MouseFocus → NoFocus: Remove mouse focus unless in input focus
-            if (!element.classList.contains('input-focus')) {
-                element.classList.remove('mouse-focus');
+            if (currentFocusState === FocusState.NO_FOCUS) {
+                element.style.backgroundColor = '';
             }
         }
         
         function handleClick(element) {
-            // MouseFocus/NoFocus → InputFocus
-            clearAllFocusStates();
-            element.classList.add('input-focus');
-            element.classList.remove('mouse-focus');
-            editSentence(element);
-        }
-        
-        function clearAllFocusStates() {
-            // Clear all focus states from all elements
-            document.querySelectorAll('.sentence-line').forEach(el => {
-                el.classList.remove('mouse-focus', 'input-focus');
-            });
+            // Mouse click transitions directly to InputFocus
+            transitionToInputFocus(element);
         }
         
         function exitInputFocus(element) {
-            // InputFocus → NoFocus
-            element.classList.remove('input-focus');
+            // Transition back to NoFocus when editing is finished
+            transitionToNoFocus();
         }
         
         // 문장 편집
-        function editSentence(element) {
+        function editSentence(element, cursorPosition = null) {
             if (element.querySelector('.sentence-input')) {
                 return; // 이미 편집 중
             }
-            
-            // Clear all focus states and set this element to input focus
-            clearAllFocusStates();
-            element.classList.add('input-focus');
             
             const currentText = element.classList.contains('empty') ? '' : element.textContent;
             element.innerHTML = '';
@@ -411,56 +623,35 @@
             let savedByEnter = false;
             
             textarea.onblur = () => {
-                if (!savedByEnter) {
-                    saveSentence(element, textarea);
+                if (!savedByEnter && currentFocusState === FocusState.INPUT_FOCUS) {
+                    saveCurrentSentenceContent(element, textarea);
                 }
             };
+            
+            // Handle Enter key for sentence operations
             textarea.onkeydown = (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     savedByEnter = true;
                     handleEnterKey(element, textarea);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    handleArrowNavigation(element, 'up');
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    handleArrowNavigation(element, 'down');
                 }
+                // Note: Arrow key navigation is handled by global handler
             };
             
             element.appendChild(textarea);
             textarea.focus();
-            // Explicitly set cursor position to beginning (leftmost position)
-            textarea.setSelectionRange(0, 0);
+            
+            // Set cursor position - use provided position or default to end
+            if (cursorPosition !== null) {
+                const maxPos = textarea.value.length;
+                const pos = Math.min(cursorPosition, maxPos);
+                textarea.setSelectionRange(pos, pos);
+            } else {
+                // Default behavior: set cursor to end for InputFocus from WatchFocus
+                textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            }
         }
         
-        function handleArrowNavigation(currentElement, direction) {
-            const textarea = currentElement.querySelector('.sentence-input');
-            if (!textarea) return;
-            
-            // Save current content first
-            const content = textarea.value;
-            saveSentence(currentElement, textarea);
-            
-            // Find target sentence line
-            const currentWrapper = currentElement.closest('.sentence-wrapper');
-            let targetWrapper;
-            
-            if (direction === 'up') {
-                targetWrapper = currentWrapper.previousElementSibling;
-            } else if (direction === 'down') {
-                targetWrapper = currentWrapper.nextElementSibling;
-            }
-            
-            // If target exists, edit it
-            if (targetWrapper) {
-                const targetSentenceLine = targetWrapper.querySelector('.sentence-line');
-                if (targetSentenceLine) {
-                    setTimeout(() => handleClick(targetSentenceLine), 0);
-                }
-            }
-        }
         
         function handleEnterKey(element, textarea) {
             const content = textarea.value;
@@ -497,7 +688,16 @@
                 sendSentenceUpdate(id, newId, content, () => {
                     // Move cursor to beginning of next line (current line)
                     finishEditing(element, content);
-                    setTimeout(() => handleClick(element), 0);
+                    setTimeout(() => {
+                        transitionToInputFocus(element);
+                        // Set cursor to beginning of line
+                        setTimeout(() => {
+                            const textarea = element.querySelector('.sentence-input');
+                            if (textarea) {
+                                textarea.setSelectionRange(0, 0);
+                            }
+                        }, 50);
+                    }, 0);
                 });
             });
         }
@@ -517,7 +717,16 @@
                     // Move cursor to beginning of next line
                     finishEditing(element, content);
                     const newSentenceLine = newWrapper.querySelector('.sentence-line');
-                    setTimeout(() => handleClick(newSentenceLine), 0);
+                    setTimeout(() => {
+                        transitionToInputFocus(newSentenceLine);
+                        // Set cursor to beginning of line
+                        setTimeout(() => {
+                            const textarea = newSentenceLine.querySelector('.sentence-input');
+                            if (textarea) {
+                                textarea.setSelectionRange(0, 0);
+                            }
+                        }, 50);
+                    }, 0);
                 });
             });
         }
@@ -540,7 +749,16 @@
                     // Move cursor to beginning of next line
                     finishEditing(element, beforeContent);
                     const newSentenceLine = newWrapper.querySelector('.sentence-line');
-                    setTimeout(() => handleClick(newSentenceLine), 0);
+                    setTimeout(() => {
+                        transitionToInputFocus(newSentenceLine);
+                        // Set cursor to beginning of line
+                        setTimeout(() => {
+                            const textarea = newSentenceLine.querySelector('.sentence-input');
+                            if (textarea) {
+                                textarea.setSelectionRange(0, 0);
+                            }
+                        }, 50);
+                    }, 0);
                 });
             });
         }
@@ -577,6 +795,35 @@
             }
         }
         
+        function saveCurrentSentenceContent(element, textarea) {
+            const content = textarea.value;
+            const id = element.getAttribute('data-id');
+            const prevId = element.getAttribute('data-prev-id');
+            
+            // Save content without changing focus state
+            element.innerHTML = '';
+            
+            if (content.trim() === '') {
+                element.classList.add('empty');
+            } else {
+                element.classList.remove('empty');
+                element.textContent = content;
+            }
+            
+            // WebSocket으로 전송
+            if (stompClient && stompClient.connected && currentDocumentId) {
+                const sentenceRequest = {
+                    id: id,
+                    prevId: prevId,
+                    rootDocumentId: currentDocumentId,
+                    content: content,
+                    sessionId: sessionId
+                };
+                
+                stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));
+            }
+        }
+
         function saveSentence(element, textarea) {
             const content = textarea.value;
             const id = element.getAttribute('data-id');
