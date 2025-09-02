@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문서 관리 - 랜딩 페이지</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .create-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .create-section h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .create-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .create-form input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .create-form button {
+            padding: 12px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            white-space: nowrap;
+        }
+
+        .create-form button:hover {
+            background-color: #0056b3;
+        }
+
+        .create-form button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .documents-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .documents-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .document-item {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .document-item:hover {
+            border-color: #007bff;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .document-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .document-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .document-id {
+            font-family: monospace;
+            background-color: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #999;
+        }
+
+        @media (max-width: 768px) {
+            .create-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .create-form input,
+            .create-form button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>협업 문서 관리</h1>
+        <p>문서를 생성하거나 기존 문서를 선택하여 협업 편집을 시작하세요.</p>
+    </div>
+
+    <div class="create-section">
+        <h2>새 문서 생성</h2>
+        <div class="create-form">
+            <input type="text" id="documentTitle" placeholder="문서 제목을 입력하세요" maxlength="100">
+            <button onclick="createDocument()" id="createBtn">문서 생성</button>
+        </div>
+    </div>
+
+    <div class="documents-section">
+        <h2>기존 문서 목록</h2>
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        <div id="loading" class="loading">문서 목록을 불러오는 중...</div>
+        <div id="documentsList" class="documents-list" style="display: none;"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>생성된 문서가 없습니다</h3>
+            <p>위의 양식을 사용하여 새 문서를 생성해보세요.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 페이지 로드 시 문서 목록 불러오기
+    window.onload = function() {
+        loadDocuments();
+    };
+
+    // 문서 목록 불러오기
+    async function loadDocuments() {
+        try {
+            showLoading();
+            const response = await fetch('/api/documents');
+            
+            if (response.ok) {
+                const documents = await response.json();
+                displayDocuments(documents);
+            } else {
+                throw new Error('문서 목록을 불러올 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('Error loading documents:', error);
+            showError('문서 목록을 불러오는 중 오류가 발생했습니다: ' + error.message);
+        }
+    }
+
+    // 문서 목록 표시
+    function displayDocuments(documents) {
+        const loading = document.getElementById('loading');
+        const documentsList = document.getElementById('documentsList');
+        const emptyState = document.getElementById('emptyState');
+        const errorMessage = document.getElementById('errorMessage');
+
+        loading.style.display = 'none';
+        errorMessage.style.display = 'none';
+
+        if (documents.length === 0) {
+            emptyState.style.display = 'block';
+            documentsList.style.display = 'none';
+        } else {
+            emptyState.style.display = 'none';
+            documentsList.style.display = 'grid';
+            
+            documentsList.innerHTML = '';
+            documents.forEach(doc => {
+                const docElement = createDocumentElement(doc);
+                documentsList.appendChild(docElement);
+            });
+        }
+    }
+
+    // 문서 요소 생성
+    function createDocumentElement(doc) {
+        const docItem = document.createElement('div');
+        docItem.className = 'document-item';
+        docItem.onclick = () => openDocument(doc.id);
+        
+        docItem.innerHTML = `
+            <div class="document-title">${escapeHtml(doc.title)}</div>
+            <div class="document-meta">
+                <span class="document-id">ID: ${escapeHtml(doc.id)}</span>
+                <span>시퀀스: ${doc.lastUpdateSequence}</span>
+            </div>
+        `;
+        
+        return docItem;
+    }
+
+    // HTML 이스케이프
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // 문서 생성
+    async function createDocument() {
+        const titleInput = document.getElementById('documentTitle');
+        const createBtn = document.getElementById('createBtn');
+        const title = titleInput.value.trim();
+        
+        if (!title) {
+            alert('문서 제목을 입력하세요.');
+            titleInput.focus();
+            return;
+        }
+
+        try {
+            createBtn.disabled = true;
+            createBtn.textContent = '생성 중...';
+
+            const response = await fetch('/api/documents', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({title: title})
+            });
+
+            if (response.ok) {
+                const docData = await response.json();
+                titleInput.value = '';
+                alert('문서가 생성되었습니다: ' + docData.title);
+                
+                // 문서 목록 새로고침
+                loadDocuments();
+                
+                // 생성된 문서로 바로 이동할지 묻기
+                if (confirm('생성된 문서를 바로 편집하시겠습니까?')) {
+                    openDocument(docData.id);
+                }
+            } else {
+                throw new Error('문서 생성에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('Error creating document:', error);
+            alert('문서 생성 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+            createBtn.disabled = false;
+            createBtn.textContent = '문서 생성';
+        }
+    }
+
+    // 문서 편집 페이지로 이동
+    function openDocument(documentId) {
+        window.location.href = `/editor?id=${encodeURIComponent(documentId)}`;
+    }
+
+    // 로딩 상태 표시
+    function showLoading() {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('documentsList').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('errorMessage').style.display = 'none';
+    }
+
+    // 에러 메시지 표시
+    function showError(message) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('documentsList').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        
+        const errorElement = document.getElementById('errorMessage');
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+
+    // Enter 키로 문서 생성
+    document.getElementById('documentTitle').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            createDocument();
+        }
+    });
+</script>
+</body>
+</html>

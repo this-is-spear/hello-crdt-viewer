@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문서 편집기</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #333;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            color: #333;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background-color: #f8f9fa;
+            border-color: #adb5bd;
+        }
+
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+
+        .document-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .document-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .document-meta {
+            color: #666;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .editor {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            min-height: 400px;
+        }
+
+        .sentence-wrapper {
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .sentence-line {
+            padding: 10px;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            min-height: 20px;
+            cursor: text;
+            position: relative;
+        }
+
+        .sentence-line.watch-focus {
+            border-color: #007bff;
+            background-color: #f8f9fa;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .sentence-line.input-focus {
+            border-color: #0056b3;
+            border-width: 3px;
+            background-color: white;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .sentence-line.input-focus:hover {
+            border-color: #0056b3;
+            background-color: white;
+        }
+
+        .sentence-line.empty {
+            color: #999;
+        }
+
+        .sentence-line:focus-visible,
+        .sentence-line.watch-focus {
+            outline: 2px solid #007bff;
+            outline-offset: 2px;
+        }
+
+        .sentence-line.input-focus {
+            outline: 3px solid #0056b3;
+            outline-offset: 2px;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .sentence-input {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            resize: none;
+            min-height: 20px;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .connected {
+            color: #28a745;
+        }
+
+        .disconnected {
+            color: #dc3545;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>협업 에디터</h1>
+        <div class="header-actions">
+            <a href="/" class="btn">← 문서 목록</a>
+        </div>
+    </div>
+
+    <div id="loading" class="loading">문서를 불러오는 중...</div>
+    <div id="errorMessage" class="error" style="display: none;"></div>
+
+    <div id="documentContent" style="display: none;">
+        <div class="document-info">
+            <div class="document-title" id="documentTitle">문서 제목</div>
+            <div class="document-meta">
+                <span>문서 ID: <strong id="documentId">-</strong></span>
+                <span>마지막 업데이트: <strong id="lastUpdate">-</strong></span>
+            </div>
+        </div>
+
+        <div class="editor" id="editor">
+            <div class="sentence-wrapper">
+                <div class="sentence-line empty"
+                     onclick="handleClick(this)"
+                     onmouseenter="handleMouseEnter(this)"
+                     onmouseleave="handleMouseLeave(this)"
+                     data-id="initial"
+                     data-prev-id=""></div>
+            </div>
+        </div>
+
+        <div class="status">
+            연결 상태: <span id="connectionStatus" class="disconnected">연결 안됨</span> |
+            현재 문서: <span id="currentDocument">없음</span> |
+            세션 ID: <span id="sessionId"></span>
+        </div>
+    </div>
+
+    <!-- Screen reader announcements -->
+    <div id="sr-announcements" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+</div>
+
+<script>
+    let stompClient = null;
+    let currentDocumentId = null;
+    let sessionId = generateSessionId();
+    let sentenceCounter = 0;
+
+    document.getElementById('sessionId').textContent = sessionId;
+
+    function generateSessionId() {
+        return 'session-' + Math.random().toString(36).substr(2, 9);
+    }
+
+    function generateSentenceId() {
+        return 'sentence-' + Date.now() + '-' + (++sentenceCounter);
+    }
+
+    // URL에서 문서 ID 추출
+    function getDocumentIdFromURL() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('id');
+    }
+
+    // 페이지 로드 시 실행
+    window.onload = function () {
+        const documentId = getDocumentIdFromURL();
+        if (documentId) {
+            loadDocument(documentId);
+        } else {
+            showError('문서 ID가 제공되지 않았습니다.');
+        }
+    };
+
+    // 문서 불러오기
+    async function loadDocument(documentId) {
+        try {
+            showLoading();
+            const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}`);
+
+            if (response.ok) {
+                const docData = await response.json();
+                currentDocumentId = docData.id;
+                
+                // 문서 정보 표시
+                document.getElementById('documentTitle').textContent = docData.title;
+                document.getElementById('documentId').textContent = docData.id;
+                document.getElementById('lastUpdate').textContent = docData.lastUpdateSequence || '0';
+                document.getElementById('currentDocument').textContent = docData.title;
+
+                // 문서 내용 로드
+                loadDocumentContent(docData);
+                
+                // WebSocket 연결 시작
+                connect();
+                
+                // UI 표시
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('documentContent').style.display = 'block';
+            } else if (response.status === 404) {
+                showError('문서를 찾을 수 없습니다.');
+            } else {
+                throw new Error('문서를 불러올 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('Error loading document:', error);
+            showError('문서 불러오기 중 오류가 발생했습니다: ' + error.message);
+        }
+    }
+
+    // 문서 내용 로드
+    function loadDocumentContent(docData) {
+        const editor = document.getElementById('editor');
+        editor.innerHTML = '';
+
+        // 문서에 문장이 있다면 로드, 없으면 빈 문장으로 시작
+        if (docData.sentences && docData.sentences.length > 0) {
+            docData.sentences.forEach(sentence => {
+                const wrapper = createSentenceWrapper(sentence.id, sentence.prevId, sentence.content);
+                editor.appendChild(wrapper);
+            });
+        } else {
+            initializeEditor();
+        }
+    }
+
+    // 에디터 초기화
+    function initializeEditor() {
+        const editor = document.getElementById('editor');
+        editor.innerHTML = '';
+
+        const wrapper = createSentenceWrapper(generateSentenceId(), '', '');
+        editor.appendChild(wrapper);
+    }
+
+    // 로딩 상태 표시
+    function showLoading() {
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('errorMessage').style.display = 'none';
+        document.getElementById('documentContent').style.display = 'none';
+    }
+
+    // 에러 메시지 표시
+    function showError(message) {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('documentContent').style.display = 'none';
+        
+        const errorElement = document.getElementById('errorMessage');
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+    }
+
+    // WebSocket 연결 설정
+    function connect() {
+        const socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        stompClient.connect({}, function (frame) {
+            console.log('Connected: ' + frame);
+            document.getElementById('connectionStatus').textContent = '연결됨';
+            document.getElementById('connectionStatus').className = 'connected';
+
+            if (currentDocumentId) {
+                subscribeToDocument(currentDocumentId);
+            }
+        }, function (error) {
+            console.log('Connection error: ', error);
+            document.getElementById('connectionStatus').textContent = '연결 실패';
+            document.getElementById('connectionStatus').className = 'disconnected';
+
+            // 재연결 시도
+            setTimeout(connect, 5000);
+        });
+    }
+
+    function subscribeToDocument(documentId) {
+        if (stompClient && stompClient.connected) {
+            stompClient.subscribe('/topic/document/' + documentId, function (message) {
+                const sentenceResponse = JSON.parse(message.body);
+                handleIncomingSentence(sentenceResponse);
+            });
+        }
+    }
+
+    function handleIncomingSentence(sentenceResponse) {
+        // 자신이 보낸 메시지는 제외
+        if (sentenceResponse.sessionId === sessionId) {
+            return;
+        }
+
+        console.log('Received sentence:', sentenceResponse);
+
+        // 문서에 새 문장 추가 또는 업데이트
+        let existingSentence = document.querySelector(`[data-id="${sentenceResponse.id}"]`);
+
+        if (existingSentence) {
+            // 기존 문장 업데이트
+            existingSentence.textContent = sentenceResponse.content;
+            if (sentenceResponse.content.trim() === '') {
+                existingSentence.classList.add('empty');
+            } else {
+                existingSentence.classList.remove('empty');
+            }
+        } else {
+            // 새 문장 추가
+            insertSentenceInOrder(sentenceResponse);
+        }
+    }
+
+    function insertSentenceInOrder(sentenceData) {
+        const editor = document.getElementById('editor');
+        const newWrapper = createSentenceWrapper(sentenceData.id, sentenceData.prevId, sentenceData.content);
+
+        if (sentenceData.prevId === '' || sentenceData.prevId === null) {
+            // 첫 번째 문장
+            editor.insertBefore(newWrapper, editor.firstChild);
+        } else {
+            // prevId 다음에 삽입
+            const prevSentence = document.querySelector(`[data-id="${sentenceData.prevId}"]`);
+            if (prevSentence) {
+                const prevWrapper = prevSentence.closest('.sentence-wrapper');
+                editor.insertBefore(newWrapper, prevWrapper.nextSibling);
+            } else {
+                // prevId를 찾을 수 없으면 마지막에 추가
+                editor.appendChild(newWrapper);
+            }
+        }
+    }
+
+    function createSentenceWrapper(id, prevId, content) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'sentence-wrapper';
+
+        const sentenceLine = document.createElement('div');
+        sentenceLine.className = content.trim() === '' ? 'sentence-line empty' : 'sentence-line';
+        sentenceLine.setAttribute('data-id', id);
+        sentenceLine.setAttribute('data-prev-id', prevId);
+        sentenceLine.textContent = content;
+        sentenceLine.onclick = () => handleClick(sentenceLine);
+        sentenceLine.onmouseenter = () => handleMouseEnter(sentenceLine);
+        sentenceLine.onmouseleave = () => handleMouseLeave(sentenceLine);
+
+        wrapper.appendChild(sentenceLine);
+
+        return wrapper;
+    }
+
+    // Three-State Focus System
+    const FocusState = {
+        NO_FOCUS: 'no-focus',
+        WATCH_FOCUS: 'watch-focus',
+        INPUT_FOCUS: 'input-focus'
+    };
+
+    let currentFocusState = FocusState.NO_FOCUS;
+    let currentFocusedElement = null;
+    let savedCursorPosition = 0;
+
+    // Global keyboard event handler
+    document.addEventListener('keydown', handleGlobalKeydown);
+
+    function handleGlobalKeydown(e) {
+        switch (currentFocusState) {
+            case FocusState.NO_FOCUS:
+                handleNoFocusKeys(e);
+                break;
+            case FocusState.WATCH_FOCUS:
+                handleWatchFocusKeys(e);
+                break;
+            case FocusState.INPUT_FOCUS:
+                handleInputFocusKeys(e);
+                break;
+        }
+    }
+
+    function handleNoFocusKeys(e) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            transitionToWatchFocus(getFirstSentence());
+        }
+    }
+
+    function handleWatchFocusKeys(e) {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            navigateWatchFocus('up');
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            navigateWatchFocus('down');
+        } else if (e.key === 'Enter' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            transitionToInputFocus(currentFocusedElement);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            transitionToNoFocus();
+        }
+    }
+
+    function handleInputFocusKeys(e) {
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            navigateInputFocus('up');
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            navigateInputFocus('down');
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            transitionToWatchFocus(currentFocusedElement);
+        }
+    }
+
+    function transitionToNoFocus() {
+        clearAllFocusStates();
+        currentFocusState = FocusState.NO_FOCUS;
+        currentFocusedElement = null;
+        updateAccessibility();
+    }
+
+    function transitionToWatchFocus(element) {
+        if (!element) return;
+        clearAllFocusStates();
+        element.classList.add('watch-focus');
+        currentFocusState = FocusState.WATCH_FOCUS;
+        currentFocusedElement = element;
+        updateAccessibility();
+    }
+
+    function transitionToInputFocus(element, cursorPosition = null) {
+        if (!element) return;
+        clearAllFocusStates();
+        element.classList.add('input-focus');
+        currentFocusState = FocusState.INPUT_FOCUS;
+        currentFocusedElement = element;
+        editSentence(element, cursorPosition);
+        updateAccessibility();
+    }
+
+    function navigateWatchFocus(direction) {
+        if (!currentFocusedElement) return;
+
+        const targetElement = getAdjacentSentence(currentFocusedElement, direction);
+        if (targetElement) {
+            transitionToWatchFocus(targetElement);
+        }
+    }
+
+    function navigateInputFocus(direction) {
+        if (!currentFocusedElement) return;
+
+        // Save cursor position
+        const textarea = currentFocusedElement.querySelector('.sentence-input');
+        if (textarea) {
+            savedCursorPosition = textarea.selectionStart;
+            // Save without exiting focus state
+            saveCurrentSentenceContent(currentFocusedElement, textarea);
+        }
+
+        // Navigate to adjacent sentence
+        const targetElement = getAdjacentSentence(currentFocusedElement, direction);
+        if (targetElement) {
+            // Directly transition to InputFocus with saved cursor position
+            transitionToInputFocus(targetElement, savedCursorPosition);
+        }
+    }
+
+    function getFirstSentence() {
+        return document.querySelector('.sentence-line');
+    }
+
+    function getAdjacentSentence(element, direction) {
+        const currentWrapper = element.closest('.sentence-wrapper');
+        let targetWrapper;
+
+        if (direction === 'up') {
+            targetWrapper = currentWrapper.previousElementSibling;
+        } else {
+            targetWrapper = currentWrapper.nextElementSibling;
+        }
+
+        return targetWrapper ? targetWrapper.querySelector('.sentence-line') : null;
+    }
+
+    function clearAllFocusStates() {
+        document.querySelectorAll('.sentence-line').forEach(el => {
+            el.classList.remove('watch-focus', 'input-focus');
+            // Clear any inline background styles that might cause ghosting
+            el.style.backgroundColor = '';
+
+            // Remove any existing input forms and restore content
+            const textarea = el.querySelector('.sentence-input');
+            if (textarea) {
+                const content = textarea.value;
+                el.innerHTML = '';
+
+                if (content.trim() === '') {
+                    el.classList.add('empty');
+                } else {
+                    el.classList.remove('empty');
+                    el.textContent = content;
+                }
+            }
+        });
+    }
+
+    function updateAccessibility() {
+        const announcements = document.getElementById('sr-announcements');
+
+        if (currentFocusedElement) {
+            switch (currentFocusState) {
+                case FocusState.WATCH_FOCUS:
+                    currentFocusedElement.setAttribute('aria-label', '선택된 문장, Enter 또는 왼쪽 화살표로 편집, 위/아래 화살표로 이동, ESC로 포커스 해제');
+                    currentFocusedElement.setAttribute('tabindex', '0');
+                    announceToScreenReader('네비게이션 모드: 문장을 선택했습니다. Enter 키로 편집하거나 화살표 키로 이동하세요.');
+                    break;
+                case FocusState.INPUT_FOCUS:
+                    currentFocusedElement.setAttribute('aria-label', '편집 중인 문장, 위/아래 화살표로 문장 이동, ESC로 네비게이션 모드');
+                    announceToScreenReader('편집 모드: 문장을 편집하고 있습니다. ESC 키로 네비게이션 모드로 돌아가세요.');
+                    break;
+                case FocusState.NO_FOCUS:
+                    announceToScreenReader('포커스가 해제되었습니다. 위/아래 화살표 키를 눌러 네비게이션을 시작하세요.');
+                    break;
+            }
+        }
+
+        // Clear tabindex from non-focused elements
+        document.querySelectorAll('.sentence-line').forEach(el => {
+            if (el !== currentFocusedElement) {
+                el.removeAttribute('tabindex');
+            }
+        });
+    }
+
+    function announceToScreenReader(message) {
+        const announcements = document.getElementById('sr-announcements');
+        if (announcements) {
+            announcements.textContent = message;
+            // Clear after a delay to allow screen readers to announce
+            setTimeout(() => {
+                announcements.textContent = '';
+            }, 1000);
+        }
+    }
+
+    // Mouse compatibility functions (kept for backward compatibility)
+    function handleMouseEnter(element) {
+        // Only show hover effect if not in any focus state
+        if (currentFocusState === FocusState.NO_FOCUS) {
+            element.style.backgroundColor = '#f8f9fa';
+        }
+    }
+
+    function handleMouseLeave(element) {
+        if (currentFocusState === FocusState.NO_FOCUS) {
+            element.style.backgroundColor = '';
+        }
+    }
+
+    function handleClick(element) {
+        // Mouse click transitions directly to InputFocus
+        transitionToInputFocus(element);
+    }
+
+    function exitInputFocus(element) {
+        // Transition back to NoFocus when editing is finished
+        transitionToNoFocus();
+    }
+
+    // 문장 편집
+    function editSentence(element, cursorPosition = null) {
+        if (element.querySelector('.sentence-input')) {
+            return; // 이미 편집 중
+        }
+
+        const currentText = element.classList.contains('empty') ? '' : element.textContent;
+        element.innerHTML = '';
+        element.classList.remove('empty');
+
+        const textarea = document.createElement('textarea');
+        textarea.className = 'sentence-input';
+        textarea.value = currentText;
+        let savedByEnter = false;
+
+        textarea.onblur = () => {
+            if (!savedByEnter && currentFocusState === FocusState.INPUT_FOCUS) {
+                saveCurrentSentenceContent(element, textarea);
+            }
+        };
+
+        // Handle Enter key for sentence operations
+        textarea.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                savedByEnter = true;
+                handleEnterKey(element, textarea);
+            }
+            // Note: Arrow key navigation is handled by global handler
+        };
+
+        element.appendChild(textarea);
+        textarea.focus();
+
+        // Set cursor position - use provided position or default to end
+        if (cursorPosition !== null) {
+            const maxPos = textarea.value.length;
+            const pos = Math.min(cursorPosition, maxPos);
+            textarea.setSelectionRange(pos, pos);
+        } else {
+            // Default behavior: set cursor to end for InputFocus from WatchFocus
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        }
+    }
+
+    function handleEnterKey(element, textarea) {
+        const content = textarea.value;
+        const cursorPosition = textarea.selectionStart;
+        const id = element.getAttribute('data-id');
+        const prevId = element.getAttribute('data-prev-id');
+
+        if (cursorPosition === 0) {
+            // Case 1: Enter at the beginning of content
+            handleEnterAtBeginning(element, content, id, prevId);
+        } else if (cursorPosition === content.length) {
+            // Case 3: Enter at the end of content
+            handleEnterAtEnd(element, content, id, prevId);
+        } else {
+            // Case 2: Enter in the middle of content
+            handleEnterInMiddle(element, content, cursorPosition, id, prevId);
+        }
+    }
+
+    function handleEnterAtBeginning(element, content, id, prevId) {
+        // Create blank line above
+        const newId = generateSentenceId();
+        const newWrapper = createSentenceWrapper(newId, prevId, '');
+
+        // Update current sentence's prevId to new sentence ID
+        element.setAttribute('data-prev-id', newId);
+
+        // Insert new sentence above current
+        const currentWrapper = element.closest('.sentence-wrapper');
+        currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper);
+
+        // Send two requests sequentially
+        sendSentenceUpdate(newId, prevId, '', () => {
+            sendSentenceUpdate(id, newId, content, () => {
+                // Move cursor to beginning of next line (current line)
+                finishEditing(element, content);
+                setTimeout(() => {
+                    transitionToInputFocus(element);
+                    // Set cursor to beginning of line
+                    setTimeout(() => {
+                        const textarea = element.querySelector('.sentence-input');
+                        if (textarea) {
+                            textarea.setSelectionRange(0, 0);
+                        }
+                    }, 50);
+                }, 0);
+            });
+        });
+    }
+
+    function handleEnterAtEnd(element, content, id, prevId) {
+        // Save current content and create blank line below
+        const newId = generateSentenceId();
+        const newWrapper = createSentenceWrapper(newId, id, '');
+
+        // Insert new sentence below current
+        const currentWrapper = element.closest('.sentence-wrapper');
+        currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
+
+        // Send two requests sequentially
+        sendSentenceUpdate(id, prevId, content, () => {
+            sendSentenceUpdate(newId, id, '', () => {
+                // Move cursor to beginning of next line
+                finishEditing(element, content);
+                const newSentenceLine = newWrapper.querySelector('.sentence-line');
+                setTimeout(() => {
+                    transitionToInputFocus(newSentenceLine);
+                    // Set cursor to beginning of line
+                    setTimeout(() => {
+                        const textarea = newSentenceLine.querySelector('.sentence-input');
+                        if (textarea) {
+                            textarea.setSelectionRange(0, 0);
+                        }
+                    }, 50);
+                }, 0);
+            });
+        });
+    }
+
+    function handleEnterInMiddle(element, content, cursorPosition, id, prevId) {
+        // Split content
+        const beforeContent = content.substring(0, cursorPosition);
+        const afterContent = content.substring(cursorPosition);
+
+        const newId = generateSentenceId();
+        const newWrapper = createSentenceWrapper(newId, id, afterContent);
+
+        // Insert new sentence below current
+        const currentWrapper = element.closest('.sentence-wrapper');
+        currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
+
+        // Send two requests sequentially
+        sendSentenceUpdate(id, prevId, beforeContent, () => {
+            sendSentenceUpdate(newId, id, afterContent, () => {
+                // Move cursor to beginning of next line
+                finishEditing(element, beforeContent);
+                const newSentenceLine = newWrapper.querySelector('.sentence-line');
+                setTimeout(() => {
+                    transitionToInputFocus(newSentenceLine);
+                    // Set cursor to beginning of line
+                    setTimeout(() => {
+                        const textarea = newSentenceLine.querySelector('.sentence-input');
+                        if (textarea) {
+                            textarea.setSelectionRange(0, 0);
+                        }
+                    }, 50);
+                }, 0);
+            });
+        });
+    }
+
+    function sendSentenceUpdate(id, prevId, content, callback) {
+        if (stompClient && stompClient.connected && currentDocumentId) {
+            const sentenceRequest = {
+                id: id,
+                prevId: prevId,
+                rootDocumentId: currentDocumentId,
+                content: content,
+                sessionId: sessionId
+            };
+
+            stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));
+
+            // Execute callback after a short delay to ensure sequential processing
+            setTimeout(callback, 50);
+        } else if (callback) {
+            callback();
+        }
+    }
+
+    function finishEditing(element, content) {
+        // Exit input focus and return to no focus state
+        exitInputFocus(element);
+        element.innerHTML = '';
+
+        if (content.trim() === '') {
+            element.classList.add('empty');
+        } else {
+            element.classList.remove('empty');
+            element.textContent = content;
+        }
+    }
+
+    function saveCurrentSentenceContent(element, textarea) {
+        const content = textarea.value;
+        const id = element.getAttribute('data-id');
+        const prevId = element.getAttribute('data-prev-id');
+
+        // Save content without changing focus state
+        element.innerHTML = '';
+
+        if (content.trim() === '') {
+            element.classList.add('empty');
+        } else {
+            element.classList.remove('empty');
+            element.textContent = content;
+        }
+
+        // WebSocket으로 전송
+        if (stompClient && stompClient.connected && currentDocumentId) {
+            const sentenceRequest = {
+                id: id,
+                prevId: prevId,
+                rootDocumentId: currentDocumentId,
+                content: content,
+                sessionId: sessionId
+            };
+
+            stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));
+        }
+    }
+
+    // 페이지 언로드 시 연결 해제
+    window.onbeforeunload = function () {
+        if (stompClient !== null) {
+            stompClient.disconnect();
+        }
+    };
+</script>
+</body>
+</html>
