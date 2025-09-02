@@ -1,4 +1,4 @@
-package hello.tis.hello_crdt_viewer
+package hello.tis.hello_crdt_viewer.crdt
 
 import java.time.Duration
 import org.springframework.context.annotation.Bean
@@ -10,7 +10,7 @@ import org.springframework.data.redis.stream.StreamMessageListenerContainer
 import org.springframework.data.redis.stream.StreamReceiver
 
 @Configuration
-class RedisConfiguration {
+class RedisStreamConfiguration {
     @Bean
     fun streamMessageListenerContainer(
         connectionFactory: RedisConnectionFactory,
