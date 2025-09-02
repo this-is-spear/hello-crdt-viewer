@@ -154,6 +154,112 @@
             color: #999;
         }
 
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #28a745;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 4px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease-in-out;
+            max-width: 350px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background-color: #dc3545;
+        }
+
+        .toast.warning {
+            background-color: #ffc107;
+            color: #333;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 18px;
+            cursor: pointer;
+            float: right;
+            margin-left: 10px;
+        }
+
+        .document-item {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .document-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 8px 8px 0 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .document-item:hover::before {
+            opacity: 1;
+        }
+
+        .refresh-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        .document-item {
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .document-item:hover {
+            border-color: #007bff;
+            box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .document-item.opening {
+            opacity: 0.7;
+            transform: scale(0.98);
+        }
+
         @media (max-width: 768px) {
             .create-form {
                 flex-direction: column;
@@ -183,7 +289,12 @@
     </div>
 
     <div class="documents-section">
-        <h2>기존 문서 목록</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">기존 문서 목록</h2>
+            <button onclick="loadDocuments()" class="btn" id="refreshBtn">
+                <span id="refreshIcon">🔄</span> 새로고침
+            </button>
+        </div>
         <div id="errorMessage" class="error" style="display: none;"></div>
         <div id="loading" class="loading">문서 목록을 불러오는 중...</div>
         <div id="documentsList" class="documents-list" style="display: none;"></div>
@@ -194,7 +305,82 @@
     </div>
 </div>
 
+<!-- Toast Container -->
+<div id="toastContainer"></div>
+
 <script>
+    // Toast notification functions
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        toast.innerHTML = `
+            ${message}
+            <button class="toast-close" onclick="closeToast(this)">&times;</button>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Show toast with animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 100);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            closeToast(toast.querySelector('.toast-close'));
+        }, 5000);
+    }
+    
+    function closeToast(closeBtn) {
+        const toast = closeBtn.parentElement;
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.parentElement.removeChild(toast);
+            }
+        }, 300);
+    }
+    
+    function showConfirmToast(message, onConfirm) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'toast warning';
+        
+        toast.innerHTML = `
+            <div style="margin-bottom: 10px;">${message}</div>
+            <div>
+                <button onclick="confirmToastAction(this, true)" style="background: #28a745; color: white; border: none; padding: 5px 10px; margin-right: 5px; border-radius: 3px; cursor: pointer;">예</button>
+                <button onclick="confirmToastAction(this, false)" style="background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">아니오</button>
+            </div>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Store callback function
+        toast.confirmCallback = onConfirm;
+        
+        // Show toast with animation
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 100);
+    }
+    
+    function confirmToastAction(btn, confirmed) {
+        const toast = btn.closest('.toast');
+        if (confirmed && toast.confirmCallback) {
+            toast.confirmCallback();
+        }
+        
+        toast.classList.remove('show');
+        setTimeout(() => {
+            if (toast.parentElement) {
+                toast.parentElement.removeChild(toast);
+            }
+        }, 300);
+    }
+
     // 페이지 로드 시 문서 목록 불러오기
     window.onload = function() {
         loadDocuments();
@@ -204,6 +390,15 @@
     async function loadDocuments() {
         try {
             showLoading();
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = document.getElementById('refreshIcon');
+            
+            // Add spinning animation to refresh button
+            if (refreshIcon) {
+                refreshIcon.classList.add('refresh-spin');
+                refreshBtn.disabled = true;
+            }
+            
             const response = await fetch('/api/documents');
             
             if (response.ok) {
@@ -215,6 +410,14 @@
         } catch (error) {
             console.error('Error loading documents:', error);
             showError('문서 목록을 불러오는 중 오류가 발생했습니다: ' + error.message);
+        } finally {
+            // Remove spinning animation from refresh button
+            const refreshBtn = document.getElementById('refreshBtn');
+            const refreshIcon = document.getElementById('refreshIcon');
+            if (refreshIcon) {
+                refreshIcon.classList.remove('refresh-spin');
+                refreshBtn.disabled = false;
+            }
         }
     }
 
@@ -274,7 +477,7 @@
         const title = titleInput.value.trim();
         
         if (!title) {
-            alert('문서 제목을 입력하세요.');
+            showToast('문서 제목을 입력하세요.', 'warning');
             titleInput.focus();
             return;
         }
@@ -294,21 +497,21 @@
             if (response.ok) {
                 const docData = await response.json();
                 titleInput.value = '';
-                alert('문서가 생성되었습니다: ' + docData.title);
+                showToast('문서가 생성되었습니다: ' + docData.title, 'success');
                 
                 // 문서 목록 새로고침
-                loadDocuments();
+                await loadDocuments();
                 
                 // 생성된 문서로 바로 이동할지 묻기
-                if (confirm('생성된 문서를 바로 편집하시겠습니까?')) {
+                showConfirmToast('생성된 문서를 바로 편집하시겠습니까?', () => {
                     openDocument(docData.id);
-                }
+                });
             } else {
                 throw new Error('문서 생성에 실패했습니다.');
             }
         } catch (error) {
             console.error('Error creating document:', error);
-            alert('문서 생성 중 오류가 발생했습니다: ' + error.message);
+            showToast('문서 생성 중 오류가 발생했습니다: ' + error.message, 'error');
         } finally {
             createBtn.disabled = false;
             createBtn.textContent = '문서 생성';
@@ -317,12 +520,24 @@
 
     // 문서 편집 페이지로 이동
     function openDocument(documentId) {
-        window.location.href = `/editor?id=${encodeURIComponent(documentId)}`;
+        // Add visual feedback
+        const docElement = document.querySelector(`[onclick*="${documentId}"]`);
+        if (docElement) {
+            docElement.classList.add('opening');
+            showToast('문서를 불러오는 중...', 'success');
+        }
+        
+        // Navigate after short delay for visual feedback
+        setTimeout(() => {
+            window.location.href = `/editor?id=${encodeURIComponent(documentId)}`;
+        }, 300);
     }
 
     // 로딩 상태 표시
     function showLoading() {
-        document.getElementById('loading').style.display = 'block';
+        const loading = document.getElementById('loading');
+        loading.innerHTML = '<div class="loading-spinner"></div>문서 목록을 불러오는 중...';
+        loading.style.display = 'block';
         document.getElementById('documentsList').style.display = 'none';
         document.getElementById('emptyState').style.display = 'none';
         document.getElementById('errorMessage').style.display = 'none';
@@ -343,6 +558,26 @@
     document.getElementById('documentTitle').addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             createDocument();
+        }
+    });
+
+    // 키보드 단축키 추가
+    document.addEventListener('keydown', function(e) {
+        // Ctrl+N: 새 문서 생성 (포커스를 제목 입력란으로)
+        if (e.ctrlKey && e.key === 'n') {
+            e.preventDefault();
+            document.getElementById('documentTitle').focus();
+        }
+        
+        // F5: 새로고침
+        if (e.key === 'F5') {
+            e.preventDefault();
+            loadDocuments();
+        }
+        
+        // Escape: 포커스 해제
+        if (e.key === 'Escape') {
+            document.activeElement.blur();
         }
     });
 </script>
