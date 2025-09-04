@@ -2,7 +2,6 @@ package hello.tis.hello_crdt_viewer.crdt
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
-import hello.tis.hello_crdt_viewer.crdt.Locker
 import hello.tis.hello_crdt_viewer.domain.MyDocument
 import hello.tis.hello_crdt_viewer.domain.Sentence
 import hello.tis.hello_crdt_viewer.repository.MyDocumentRepository

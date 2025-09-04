@@ -15,11 +15,8 @@ class ReliableRedissonSentencePublisher(
     fun publishToDocument(documentId: String, sentenceResponse: SentenceResponse) {
         val topic = "document.$documentId"
         val message = objectMapper.writeValueAsString(sentenceResponse)
-        
-        // Pattern Topic으로 발행 (Subscriber와 호환)
         val patternTopic = redissonClient.getTopic(topic)
         patternTopic.publish(message)
-        
         logger.info("Published message to topic: $topic, message: $message")
     }
 }
