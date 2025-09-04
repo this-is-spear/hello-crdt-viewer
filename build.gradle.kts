@@ -21,10 +21,10 @@ repositories {
 }
 
 dependencies {
+	implementation("org.redisson:redisson-spring-boot-starter:3.50.0")
 	implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
-	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("org.springframework.boot:spring-boot-starter-thymeleaf")
 	implementation("org.springframework.boot:spring-boot-starter-websocket")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

@@ -13,7 +13,15 @@ class MyDocumentService(
     private val myDocumentRepository: MyDocumentRepository,
 ) {
     fun readDocument(id: String): MyDocument? {
-        return myDocumentRepository.findByIdOrNull(id)
+        val document = myDocumentRepository.findByIdOrNull(id)
+        return document?.let { 
+            MyDocument(
+                id = it.id,
+                title = it.title,
+                sentences = it.getOrderedSentences(),
+                lastUpdateSequence = it.lastUpdateSequence
+            )
+        }
     }
 
     fun getDocuments(): List<MyDocumentMetadata> {

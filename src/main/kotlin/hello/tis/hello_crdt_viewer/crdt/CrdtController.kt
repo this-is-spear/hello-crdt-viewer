@@ -9,8 +9,9 @@ import org.springframework.stereotype.Controller
 @Controller
 class CrdtController(
     private val sequenceCreator: SequenceCreator,
-    private val redisMessagePublisher: RedisMessagePublisher,
+    private val reliableRedissonSentencePublisher: ReliableRedissonSentencePublisher,
     private val redisMessageProducer: RedisMessageProducer,
+    private val reliableRedissonSentenceSubscriber: ReliableRedissonSentenceSubscriber,
 ) {
     @MessageMapping("/sentence/publish")
     fun publishSentence(@Payload sentenceRequest: SentenceRequest) {
@@ -32,7 +33,8 @@ class CrdtController(
             sessionId = sentenceRequest.sessionId,
         )
 
-        redisMessagePublisher.publishToDocument(
+        reliableRedissonSentenceSubscriber.subscribeToDocument(sentenceRequest.rootDocumentId)
+        reliableRedissonSentencePublisher.publishToDocument(
             sentenceRequest.rootDocumentId,
             processedSentenceResponse
         )
