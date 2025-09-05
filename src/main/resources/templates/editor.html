@@ -334,6 +334,57 @@
     let currentDocumentId = null;
     let sessionId = generateSessionId();
     let sentenceCounter = 0;
+    
+    // Sentence operation queue using linked list
+    let documentLastUpdateSequence = 0;
+    
+    // Linked list node structure for sentence operations
+    class SentenceOperationNode {
+        constructor(sentenceResponse) {
+            this.data = sentenceResponse;
+            this.next = null;
+        }
+    }
+    
+    // Linked list queue for continuous processing
+    class SentenceOperationQueue {
+        constructor() {
+            this.head = null;
+            this.tail = null;
+            this.size = 0;
+        }
+        
+        enqueue(sentenceResponse) {
+            const newNode = new SentenceOperationNode(sentenceResponse);
+            if (!this.tail) {
+                this.head = this.tail = newNode;
+            } else {
+                this.tail.next = newNode;
+                this.tail = newNode;
+            }
+            this.size++;
+        }
+        
+        dequeue() {
+            if (!this.head) return null;
+            const data = this.head.data;
+            this.head = this.head.next;
+            if (!this.head) this.tail = null;
+            this.size--;
+            return data;
+        }
+        
+        isEmpty() {
+            return this.size === 0;
+        }
+        
+        getSize() {
+            return this.size;
+        }
+    }
+    
+    let sentenceQueue = new SentenceOperationQueue();
+    let isProcessing = false;
 
     document.getElementById('sessionId').textContent = sessionId;
 
@@ -370,11 +421,12 @@
             if (response.ok) {
                 const docData = await response.json();
                 currentDocumentId = docData.id;
+                documentLastUpdateSequence = docData.lastUpdateSequence || 0;
                 
                 // 문서 정보 표시
                 document.getElementById('documentTitle').textContent = docData.title;
                 document.getElementById('documentId').textContent = docData.id;
-                document.getElementById('lastUpdate').textContent = docData.lastUpdateSequence || '0';
+                document.getElementById('lastUpdate').textContent = documentLastUpdateSequence;
                 document.getElementById('currentDocument').textContent = docData.title;
 
                 // 문서 내용 로드
@@ -383,9 +435,8 @@
                 // WebSocket 연결 시작
                 connect();
                 
-                // UI 표시
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('documentContent').style.display = 'block';
+                // 연속 처리 시작
+                startContinuousProcessing();
             } else if (response.status === 404) {
                 showError('문서를 찾을 수 없습니다.');
             } else {
@@ -473,6 +524,38 @@
         }
     }
 
+    function startContinuousProcessing() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('documentContent').style.display = 'block';
+        
+        // Start continuous background processing
+        if (!isProcessing) {
+            isProcessing = true;
+            processQueueContinuously();
+        }
+    }
+    
+    function processQueueContinuously() {
+        if (!sentenceQueue.isEmpty()) {
+            const sentenceResponse = sentenceQueue.dequeue();
+            
+            // Process the sentence operation
+            if (sentenceResponse.sequence < documentLastUpdateSequence) {
+                // Old sentence detected, reload document
+                console.log('Old sentence detected, re-querying document');
+                reloadDocument();
+            } else {
+                // Apply the sentence operation
+                applySentenceOperation(sentenceResponse);
+            }
+        }
+        
+        // Continue processing in background
+        if (isProcessing) {
+            setTimeout(processQueueContinuously, 100);
+        }
+    }
+
     function handleIncomingSentence(sentenceResponse) {
         // 자신이 보낸 메시지는 제외
         if (sentenceResponse.sessionId === sessionId) {
@@ -481,6 +564,11 @@
 
         console.log('Received sentence:', sentenceResponse);
 
+        // 모든 sentence operation을 연결리스트 큐에 추가
+        sentenceQueue.enqueue(sentenceResponse);
+    }
+    
+    function applySentenceOperation(sentenceResponse) {
         // 문서에 새 문장 추가 또는 업데이트
         let existingSentence = document.querySelector(`[data-id="${sentenceResponse.id}"]`);
 
@@ -495,6 +583,24 @@
         } else {
             // 새 문장 추가
             insertSentenceInOrder(sentenceResponse);
+        }
+    }
+    
+    async function reloadDocument() {
+        if (!currentDocumentId) return;
+        
+        try {
+            const response = await fetch(`/api/documents/${encodeURIComponent(currentDocumentId)}`);
+            if (response.ok) {
+                const docData = await response.json();
+                documentLastUpdateSequence = docData.lastUpdateSequence || 0;
+                document.getElementById('lastUpdate').textContent = documentLastUpdateSequence;
+                loadDocumentContent(docData);
+                showToast('문서가 다시 로드되었습니다.', 'warning');
+            }
+        } catch (error) {
+            console.error('Error reloading document:', error);
+            showToast('문서 재로드 중 오류가 발생했습니다.', 'error');
         }
     }
 
