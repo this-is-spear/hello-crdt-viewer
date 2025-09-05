@@ -27,4 +27,15 @@ class RedisMessageProducer(
             log.error("Error producing message to queue for document {}: {}", rootDocumentId, e.message, e)
         }
     }
+
+    fun produceTwoSentencesToDocument(rootDocumentId: String, twoSentenceResponse: TwoSentenceResponse) {
+        try {
+            val queue = redissonClient.getDeque<String>(DOCUMENT_LIST_KEY)
+            val serializedMessage = objectMapper.writeValueAsString(twoSentenceResponse)
+            queue.addFirst(serializedMessage)
+            log.debug("Added two sentences message to queue for document: {}", rootDocumentId)
+        } catch (e: Exception) {
+            log.error("Error producing two sentences message to queue for document {}: {}", rootDocumentId, e.message, e)
+        }
+    }
 }

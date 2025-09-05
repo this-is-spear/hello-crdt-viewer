@@ -1,13 +1,11 @@
 package hello.tis.hello_crdt_viewer.crdt
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
-import jakarta.annotation.PostConstruct
+import java.util.concurrent.ConcurrentHashMap
 import org.redisson.api.RedissonClient
 import org.slf4j.LoggerFactory
 import org.springframework.messaging.simp.SimpMessagingTemplate
 import org.springframework.stereotype.Service
-import java.util.concurrent.ConcurrentHashMap
 
 @Service
 class ReliableRedissonSentenceSubscriber(
@@ -28,9 +26,9 @@ class ReliableRedissonSentenceSubscriber(
             val topic = redissonClient.getTopic("document.$documentId")
             topic.addListener(String::class.java) { channel, sentence ->
                 try {
-                    val sentenceResponse = objectMapper.readValue(sentence, SentenceResponse::class.java)
+                    val twoSentenceResponse = objectMapper.readValue(sentence, TwoSentenceResponse::class.java)
                     val webSocketTopic = "/topic/document/$documentId"
-                    simpMessagingTemplate.convertAndSend(webSocketTopic, sentenceResponse)
+                    simpMessagingTemplate.convertAndSend(webSocketTopic, twoSentenceResponse)
                 } catch (e: Exception) {
                     logger.error("Failed to process message for document: $documentId", e)
                 }

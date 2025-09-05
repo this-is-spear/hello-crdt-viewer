@@ -574,8 +574,9 @@
 
         if (existingSentence) {
             // 기존 문장 업데이트
-            existingSentence.textContent = sentenceResponse.content;
-            if (sentenceResponse.content.trim() === '') {
+            const safeContent = sentenceResponse.content || '';
+            existingSentence.textContent = safeContent;
+            if (safeContent.trim() === '') {
                 existingSentence.classList.add('empty');
             } else {
                 existingSentence.classList.remove('empty');
@@ -628,11 +629,14 @@
         const wrapper = document.createElement('div');
         wrapper.className = 'sentence-wrapper';
 
+        // Handle undefined or null content
+        const safeContent = content || '';
+        
         const sentenceLine = document.createElement('div');
-        sentenceLine.className = content.trim() === '' ? 'sentence-line empty' : 'sentence-line';
+        sentenceLine.className = safeContent.trim() === '' ? 'sentence-line empty' : 'sentence-line';
         sentenceLine.setAttribute('data-id', id);
         sentenceLine.setAttribute('data-prev-id', prevId);
-        sentenceLine.textContent = content;
+        sentenceLine.textContent = safeContent;
         sentenceLine.onclick = () => handleClick(sentenceLine);
         sentenceLine.onmouseenter = () => handleMouseEnter(sentenceLine);
         sentenceLine.onmouseleave = () => handleMouseLeave(sentenceLine);
@@ -937,22 +941,23 @@
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper);
 
-        // Send two requests sequentially
-        sendSentenceUpdate(newId, prevId, '', () => {
-            sendSentenceUpdate(id, newId, content, () => {
-                // Move cursor to beginning of next line (current line)
-                finishEditing(element, content);
+        // Send two sentence request
+        const firstRequest = { id: newId, prevId: prevId, content: '' };
+        const secondRequest = { id: id, prevId: newId, content: content };
+
+        sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
+            // Move cursor to beginning of next line (current line)
+            finishEditing(element, content);
+            setTimeout(() => {
+                transitionToInputFocus(element);
+                // Set cursor to beginning of line
                 setTimeout(() => {
-                    transitionToInputFocus(element);
-                    // Set cursor to beginning of line
-                    setTimeout(() => {
-                        const textarea = element.querySelector('.sentence-input');
-                        if (textarea) {
-                            textarea.setSelectionRange(0, 0);
-                        }
-                    }, 50);
-                }, 0);
-            });
+                    const textarea = element.querySelector('.sentence-input');
+                    if (textarea) {
+                        textarea.setSelectionRange(0, 0);
+                    }
+                }, 50);
+            }, 0);
         });
     }
 
@@ -965,23 +970,24 @@
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
-        // Send two requests sequentially
-        sendSentenceUpdate(id, prevId, content, () => {
-            sendSentenceUpdate(newId, id, '', () => {
-                // Move cursor to beginning of next line
-                finishEditing(element, content);
-                const newSentenceLine = newWrapper.querySelector('.sentence-line');
+        // Send two sentence request
+        const firstRequest = { id: id, prevId: prevId, content: content };
+        const secondRequest = { id: newId, prevId: id, content: '' };
+
+        sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
+            // Move cursor to beginning of next line
+            finishEditing(element, content);
+            const newSentenceLine = newWrapper.querySelector('.sentence-line');
+            setTimeout(() => {
+                transitionToInputFocus(newSentenceLine);
+                // Set cursor to beginning of line
                 setTimeout(() => {
-                    transitionToInputFocus(newSentenceLine);
-                    // Set cursor to beginning of line
-                    setTimeout(() => {
-                        const textarea = newSentenceLine.querySelector('.sentence-input');
-                        if (textarea) {
-                            textarea.setSelectionRange(0, 0);
-                        }
-                    }, 50);
-                }, 0);
-            });
+                    const textarea = newSentenceLine.querySelector('.sentence-input');
+                    if (textarea) {
+                        textarea.setSelectionRange(0, 0);
+                    }
+                }, 50);
+            }, 0);
         });
     }
 
@@ -997,40 +1003,52 @@
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
-        // Send two requests sequentially
-        sendSentenceUpdate(id, prevId, beforeContent, () => {
-            sendSentenceUpdate(newId, id, afterContent, () => {
-                // Move cursor to beginning of next line
-                finishEditing(element, beforeContent);
-                const newSentenceLine = newWrapper.querySelector('.sentence-line');
+        // Send two sentence request
+        const firstRequest = { id: id, prevId: prevId, content: beforeContent };
+        const secondRequest = { id: newId, prevId: id, content: afterContent };
+
+        sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
+            // Move cursor to beginning of next line
+            finishEditing(element, beforeContent);
+            const newSentenceLine = newWrapper.querySelector('.sentence-line');
+            setTimeout(() => {
+                transitionToInputFocus(newSentenceLine);
+                // Set cursor to beginning of line
                 setTimeout(() => {
-                    transitionToInputFocus(newSentenceLine);
-                    // Set cursor to beginning of line
-                    setTimeout(() => {
-                        const textarea = newSentenceLine.querySelector('.sentence-input');
-                        if (textarea) {
-                            textarea.setSelectionRange(0, 0);
-                        }
-                    }, 50);
-                }, 0);
-            });
+                    const textarea = newSentenceLine.querySelector('.sentence-input');
+                    if (textarea) {
+                        textarea.setSelectionRange(0, 0);
+                    }
+                }, 50);
+            }, 0);
         });
     }
 
-    function sendSentenceUpdate(id, prevId, content, callback) {
+    function sendTwoSentenceUpdate(firstRequest, secondRequest, callback) {
         if (stompClient && stompClient.connected && currentDocumentId) {
-            const sentenceRequest = {
-                id: id,
-                prevId: prevId,
-                rootDocumentId: currentDocumentId,
-                content: content,
-                sessionId: sessionId
+            const twoSentenceRequest = {
+                firstRequest: {
+                    id: firstRequest.id,
+                    prevId: firstRequest.prevId,
+                    rootDocumentId: currentDocumentId,
+                    content: firstRequest.content,
+                    sessionId: sessionId
+                },
+                secondRequest: {
+                    id: secondRequest.id,
+                    prevId: secondRequest.prevId,
+                    rootDocumentId: currentDocumentId,
+                    content: secondRequest.content,
+                    sessionId: sessionId
+                }
             };
 
-            stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));
+            stompClient.send('/app/sentence/publish/two', {}, JSON.stringify(twoSentenceRequest));
 
-            // Execute callback after a short delay to ensure sequential processing
-            setTimeout(callback, 50);
+            // Execute callback after a short delay
+            if (callback) {
+                setTimeout(callback, 50);
+            }
         } else if (callback) {
             callback();
         }
@@ -1064,18 +1082,9 @@
             element.textContent = content;
         }
 
-        // WebSocket으로 전송
-        if (stompClient && stompClient.connected && currentDocumentId) {
-            const sentenceRequest = {
-                id: id,
-                prevId: prevId,
-                rootDocumentId: currentDocumentId,
-                content: content,
-                sessionId: sessionId
-            };
-
-            stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));
-        }
+        // Note: We don't send individual WebSocket requests here anymore
+        // Enter key operations use TwoSentenceRequest via sendTwoSentenceUpdate()
+        // This function is only for UI state management
     }
 
     // 페이지 언로드 시 연결 해제

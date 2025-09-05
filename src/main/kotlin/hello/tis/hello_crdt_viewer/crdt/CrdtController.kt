@@ -13,34 +13,59 @@ class CrdtController(
     private val redisMessageProducer: RedisMessageProducer,
     private val reliableRedissonSentenceSubscriber: ReliableRedissonSentenceSubscriber,
 ) {
-    @MessageMapping("/sentence/publish")
-    fun publishSentence(@Payload sentenceRequest: SentenceRequest) {
-        val documentSequence = sequenceCreator.getNowTime()
-        val processedSentence = Sentence(
-            id = sentenceRequest.id,
-            prevId = sentenceRequest.prevId,
-            rootDocumentId = sentenceRequest.rootDocumentId,
-            content = sentenceRequest.content,
-            sequence = documentSequence,
+    @MessageMapping("/sentence/publish/two")
+    fun publishTwoSentences(@Payload twoSentenceRequest: TwoSentenceRequest) {
+        val firstDocumentSequence = sequenceCreator.getNowTime()
+        val firstProcessedSentence = Sentence(
+            id = twoSentenceRequest.firstRequest.id,
+            prevId = twoSentenceRequest.firstRequest.prevId,
+            rootDocumentId = twoSentenceRequest.firstRequest.rootDocumentId,
+            content = twoSentenceRequest.firstRequest.content,
+            sequence = firstDocumentSequence,
         )
 
-        val processedSentenceResponse = SentenceResponse(
-            id = sentenceRequest.id,
-            prevId = sentenceRequest.prevId,
-            rootDocumentId = sentenceRequest.rootDocumentId,
-            content = sentenceRequest.content,
-            sequence = processedSentence.sequence,
-            sessionId = sentenceRequest.sessionId,
+        val firstProcessedSentenceResponse = SentenceResponse(
+            id = twoSentenceRequest.firstRequest.id,
+            prevId = twoSentenceRequest.firstRequest.prevId,
+            rootDocumentId = twoSentenceRequest.firstRequest.rootDocumentId,
+            content = twoSentenceRequest.firstRequest.content,
+            sequence = firstProcessedSentence.sequence,
+            sessionId = twoSentenceRequest.firstRequest.sessionId,
         )
 
-        reliableRedissonSentenceSubscriber.subscribeToDocument(sentenceRequest.rootDocumentId)
-        reliableRedissonSentencePublisher.publishToDocument(
-            sentenceRequest.rootDocumentId,
-            processedSentenceResponse
+        // Process second sentence
+        val secondDocumentSequence = sequenceCreator.getNowTime()
+        val secondProcessedSentence = Sentence(
+            id = twoSentenceRequest.secondRequest.id,
+            prevId = twoSentenceRequest.secondRequest.prevId,
+            rootDocumentId = twoSentenceRequest.secondRequest.rootDocumentId,
+            content = twoSentenceRequest.secondRequest.content,
+            sequence = secondDocumentSequence,
         )
-        redisMessageProducer.produceToDocument(
-            sentenceRequest.rootDocumentId,
-            processedSentenceResponse
+
+        val secondProcessedSentenceResponse = SentenceResponse(
+            id = twoSentenceRequest.secondRequest.id,
+            prevId = twoSentenceRequest.secondRequest.prevId,
+            rootDocumentId = twoSentenceRequest.secondRequest.rootDocumentId,
+            content = twoSentenceRequest.secondRequest.content,
+            sequence = secondProcessedSentence.sequence,
+            sessionId = twoSentenceRequest.secondRequest.sessionId,
+        )
+
+        // Create TwoSentenceResponse and send as a single unit
+        val twoSentenceResponse = TwoSentenceResponse(
+            firstResponse = firstProcessedSentenceResponse,
+            secondResponse = secondProcessedSentenceResponse
+        )
+
+        reliableRedissonSentenceSubscriber.subscribeToDocument(twoSentenceRequest.firstRequest.rootDocumentId)
+        reliableRedissonSentencePublisher.publishTwoSentencesToDocument(
+            twoSentenceRequest.firstRequest.rootDocumentId,
+            twoSentenceResponse
+        )
+        redisMessageProducer.produceTwoSentencesToDocument(
+            twoSentenceRequest.firstRequest.rootDocumentId,
+            twoSentenceResponse
         )
     }
 }

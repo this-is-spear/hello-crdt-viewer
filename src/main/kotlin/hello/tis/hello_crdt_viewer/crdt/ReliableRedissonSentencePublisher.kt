@@ -12,11 +12,11 @@ class ReliableRedissonSentencePublisher(
 ) {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
-    fun publishToDocument(documentId: String, sentenceResponse: SentenceResponse) {
+    fun publishTwoSentencesToDocument(documentId: String, twoSentenceResponse: TwoSentenceResponse) {
         val topic = "document.$documentId"
-        val message = objectMapper.writeValueAsString(sentenceResponse)
+        val message = objectMapper.writeValueAsString(twoSentenceResponse)
         val patternTopic = redissonClient.getTopic(topic)
         patternTopic.publish(message)
-        logger.info("Published message to topic: $topic, message: $message")
+        logger.info("Published two sentences message to topic: $topic, message: $message")
     }
 }

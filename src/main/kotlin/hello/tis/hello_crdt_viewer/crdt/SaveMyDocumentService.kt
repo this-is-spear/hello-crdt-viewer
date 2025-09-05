@@ -25,10 +25,12 @@ class SaveMyDocumentService(
         try {
             val queue = redissonClient.getDeque<String>(RedisMessageProducer.DOCUMENT_LIST_KEY)
             val pendingSentences = mutableListOf<SentenceResponse>()
-            while (true) {
-                val messages = queue.pollLast(1000)
-                if (messages.isEmpty()) break
-                pendingSentences += messages.map { objectMapper.readValue<SentenceResponse>(it) }
+            val messages = queue.pollLast(1000)
+            messages.forEach { message ->
+                // Try to parse as TwoSentenceResponse first
+                val twoSentenceResponse = objectMapper.readValue<TwoSentenceResponse>(message)
+                pendingSentences.add(twoSentenceResponse.firstResponse)
+                pendingSentences.add(twoSentenceResponse.secondResponse)
             }
 
             if (pendingSentences.isNotEmpty()) {
