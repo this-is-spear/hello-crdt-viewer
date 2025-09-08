@@ -68,7 +68,7 @@ class CrdtController(
             twoSentenceResponse
         )
         redisMessageProducer.produceTwoSentencesToDocument(
-            twoSentenceRequest.firstRequest.rootDocumentId,
+            twoSentenceRequest.secondRequest.rootDocumentId,
             twoSentenceResponse
         )
     }

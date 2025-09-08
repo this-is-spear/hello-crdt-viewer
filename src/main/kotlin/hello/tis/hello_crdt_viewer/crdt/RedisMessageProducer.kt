@@ -17,17 +17,6 @@ class RedisMessageProducer(
         const val DOCUMENT_LIST_KEY = "document:queue"
     }
 
-    fun produceToDocument(rootDocumentId: String, processedSentenceResponse: SentenceResponse) {
-        try {
-            val queue = redissonClient.getDeque<String>(DOCUMENT_LIST_KEY)
-            val serializedMessage = objectMapper.writeValueAsString(processedSentenceResponse)
-            queue.addFirst(serializedMessage)
-            log.debug("Added message to queue for document: {}", rootDocumentId)
-        } catch (e: Exception) {
-            log.error("Error producing message to queue for document {}: {}", rootDocumentId, e.message, e)
-        }
-    }
-
     fun produceTwoSentencesToDocument(rootDocumentId: String, twoSentenceResponse: TwoSentenceResponse) {
         try {
             val queue = redissonClient.getDeque<String>(DOCUMENT_LIST_KEY)
