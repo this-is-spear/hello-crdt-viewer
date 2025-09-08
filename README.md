@@ -15,7 +15,7 @@ GET http://localhost:80
 
 ## 동작
 
-![화면 기록 2025-09-08 오후 9 53 05](https://github.com/user-attachments/assets/e97dccde-9a13-4568-accf-233148143cff)
+![화면 기록 2025-09-08 오후 9 53 05 (1)](https://github.com/user-attachments/assets/f596d02f-1aec-4ee0-a3e2-49271c711af7)
 
 
 ## 정리한 내용
