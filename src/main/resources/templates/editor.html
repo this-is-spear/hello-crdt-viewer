@@ -558,8 +558,8 @@
     function subscribeToDocument(documentId) {
         if (stompClient && stompClient.connected) {
             stompClient.subscribe('/topic/document/' + documentId, function (message) {
-                const sentenceResponse = JSON.parse(message.body);
-                handleIncomingSentence(sentenceResponse);
+                const messageBody = JSON.parse(message.body);
+                handleIncomingMessage(messageBody);
             });
         }
     }
@@ -596,8 +596,22 @@
         }
     }
 
+    function handleIncomingMessage(messageBody) {
+        // Check if this is a TwoSentenceResponse or individual SentenceResponse
+        if (messageBody.firstResponse && messageBody.secondResponse) {
+            // Handle TwoSentenceResponse
+            console.log('Received TwoSentenceResponse:', messageBody);
+            handleIncomingSentence(messageBody.firstResponse);
+            handleIncomingSentence(messageBody.secondResponse);
+        } else {
+            // Handle individual SentenceResponse
+            console.log('Received individual SentenceResponse:', messageBody);
+            handleIncomingSentence(messageBody);
+        }
+    }
+
     function handleIncomingSentence(sentenceResponse) {
-        console.log('Received sentence:', sentenceResponse);
+        console.log('Processing sentence:', sentenceResponse);
 
         // 모든 sentence operation을 연결리스트 큐에 추가
         sentenceQueue.enqueue(sentenceResponse);
@@ -610,6 +624,18 @@
         if (existingSentence) {
             // 기존 문장 업데이트
             const safeContent = sentenceResponse.content || '';
+            
+            // Check if this sentence is currently in INPUT_FOCUS state
+            const isCurrentlyEditing = currentFocusState === FocusState.INPUT_FOCUS && 
+                                     currentFocusedElement === existingSentence;
+            
+            if (isCurrentlyEditing) {
+                // Don't update the content if user is currently editing this sentence
+                // The user's changes take precedence over incoming updates
+                console.log('Skipping update for currently focused sentence:', sentenceResponse.id);
+                return;
+            }
+            
             existingSentence.textContent = safeContent;
             if (safeContent.trim() === '') {
                 existingSentence.classList.add('empty');
@@ -642,7 +668,7 @@
 
     function insertSentenceInOrder(sentenceData) {
         const editor = document.getElementById('editor');
-        const newWrapper = createSentenceWrapper(sentenceData.id, sentenceData.prevId, sentenceData.content);
+        const newWrapper = createSentenceWrapper(sentenceData.id, sentenceData.prevId, sentenceData.content, sentenceData.order);
 
         if (sentenceData.prevId === '' || sentenceData.prevId === null) {
             // 첫 번째 문장
