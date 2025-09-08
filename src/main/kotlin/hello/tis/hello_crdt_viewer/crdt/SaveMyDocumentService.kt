@@ -40,7 +40,8 @@ class SaveMyDocumentService(
                         prevId = sentenceResponse.prevId,
                         rootDocumentId = sentenceResponse.rootDocumentId,
                         content = sentenceResponse.content,
-                        sequence = sentenceResponse.sequence
+                        sequence = sentenceResponse.sequence,
+                        order = sentenceResponse.order
                     )
                     processDocument(sentence)
                 }

@@ -6,4 +6,5 @@ data class Sentence(
     val rootDocumentId: String,
     val content: String,
     val sequence: Long,
+    val order: String,
 )

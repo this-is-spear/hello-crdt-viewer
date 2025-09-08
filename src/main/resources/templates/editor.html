@@ -6,6 +6,24 @@
     <title>문서 편집기</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script type="module">
+        import { generateKeyBetween, generateNKeysBetween } from 'https://cdn.jsdelivr.net/npm/fractional-indexing@3.2.0/+esm';
+        
+        // 전역으로 사용할 수 있도록 window 객체에 할당
+        window.FractionalIndexing = { generateKeyBetween, generateNKeysBetween };
+        
+        // 앱 초기화
+        window.initializeApp = function() {
+            console.log('Fractional indexing library loaded');
+        };
+        
+        // DOM이 로드되면 초기화 실행
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', window.initializeApp);
+        } else {
+            window.initializeApp();
+        }
+    </script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -396,6 +414,34 @@
         return 'sentence-' + Date.now() + '-' + (++sentenceCounter);
     }
 
+    function generateOrderKey(prevId, nextId) {
+        if (!window.FractionalIndexing) {
+            console.warn('Fractional indexing library not available, using timestamp fallback');
+            return Date.now().toString();
+        }
+
+        // Get order values for previous and next sentences
+        let prevOrder = null;
+        let nextOrder = null;
+
+        if (prevId) {
+            const prevElement = document.querySelector(`[data-id="${prevId}"]`);
+            if (prevElement) {
+                prevOrder = prevElement.getAttribute('data-order');
+            }
+        }
+
+        if (nextId) {
+            const nextElement = document.querySelector(`[data-id="${nextId}"]`);
+            if (nextElement) {
+                nextOrder = nextElement.getAttribute('data-order');
+            }
+        }
+
+        // Generate new order key between prev and next
+        return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
+    }
+
     // URL에서 문서 ID 추출
     function getDocumentIdFromURL() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -456,7 +502,7 @@
         // 문서에 문장이 있다면 로드, 없으면 빈 문장으로 시작
         if (docData.sentences && docData.sentences.length > 0) {
             docData.sentences.forEach(sentence => {
-                const wrapper = createSentenceWrapper(sentence.id, sentence.prevId, sentence.content);
+                const wrapper = createSentenceWrapper(sentence.id, sentence.prevId, sentence.content, sentence.order);
                 editor.appendChild(wrapper);
             });
         } else {
@@ -469,7 +515,8 @@
         const editor = document.getElementById('editor');
         editor.innerHTML = '';
 
-        const wrapper = createSentenceWrapper(generateSentenceId(), '', '');
+        const initialOrder = generateOrderKey(null, null); // Generate initial order key
+        const wrapper = createSentenceWrapper(generateSentenceId(), '', '', initialOrder);
         editor.appendChild(wrapper);
     }
 
@@ -625,7 +672,7 @@
         }
     }
 
-    function createSentenceWrapper(id, prevId, content) {
+    function createSentenceWrapper(id, prevId, content, order = null) {
         const wrapper = document.createElement('div');
         wrapper.className = 'sentence-wrapper';
 
@@ -636,6 +683,12 @@
         sentenceLine.className = safeContent.trim() === '' ? 'sentence-line empty' : 'sentence-line';
         sentenceLine.setAttribute('data-id', id);
         sentenceLine.setAttribute('data-prev-id', prevId);
+        
+        // Set order attribute if provided
+        if (order !== null) {
+            sentenceLine.setAttribute('data-order', order);
+        }
+        
         sentenceLine.textContent = safeContent;
         sentenceLine.onclick = () => handleClick(sentenceLine);
         sentenceLine.onmouseenter = () => handleMouseEnter(sentenceLine);
@@ -932,18 +985,25 @@
     function handleEnterAtBeginning(element, content, id, prevId) {
         // Create blank line above
         const newId = generateSentenceId();
-        const newWrapper = createSentenceWrapper(newId, prevId, '');
+        
+        // Generate order for new sentence (between prevId and current sentence)
+        const currentOrder = element.getAttribute('data-order');
+        const newOrder = generateOrderKey(prevId, id);
+        const currentNewOrder = generateOrderKey(newId, null); // Update current sentence order
+        
+        const newWrapper = createSentenceWrapper(newId, prevId, '', newOrder);
 
-        // Update current sentence's prevId to new sentence ID
+        // Update current sentence's prevId to new sentence ID and update order
         element.setAttribute('data-prev-id', newId);
+        element.setAttribute('data-order', currentNewOrder);
 
         // Insert new sentence above current
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper);
 
         // Send two sentence request
-        const firstRequest = { id: newId, prevId: prevId, content: '' };
-        const secondRequest = { id: id, prevId: newId, content: content };
+        const firstRequest = { id: newId, prevId: prevId, content: '', order: newOrder };
+        const secondRequest = { id: id, prevId: newId, content: content, order: currentNewOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line (current line)
@@ -964,15 +1024,22 @@
     function handleEnterAtEnd(element, content, id, prevId) {
         // Save current content and create blank line below
         const newId = generateSentenceId();
-        const newWrapper = createSentenceWrapper(newId, id, '');
+        
+        // Generate order for new sentence (after current sentence)
+        const currentOrder = element.getAttribute('data-order');
+        const nextSibling = element.closest('.sentence-wrapper').nextElementSibling;
+        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
+        const newOrder = generateOrderKey(id, nextId);
+        
+        const newWrapper = createSentenceWrapper(newId, id, '', newOrder);
 
         // Insert new sentence below current
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
         // Send two sentence request
-        const firstRequest = { id: id, prevId: prevId, content: content };
-        const secondRequest = { id: newId, prevId: id, content: '' };
+        const firstRequest = { id: id, prevId: prevId, content: content, order: currentOrder };
+        const secondRequest = { id: newId, prevId: id, content: '', order: newOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line
@@ -997,15 +1064,22 @@
         const afterContent = content.substring(cursorPosition);
 
         const newId = generateSentenceId();
-        const newWrapper = createSentenceWrapper(newId, id, afterContent);
+        
+        // Generate order for new sentence (after current sentence)
+        const currentOrder = element.getAttribute('data-order');
+        const nextSibling = element.closest('.sentence-wrapper').nextElementSibling;
+        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
+        const newOrder = generateOrderKey(id, nextId);
+        
+        const newWrapper = createSentenceWrapper(newId, id, afterContent, newOrder);
 
         // Insert new sentence below current
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
         // Send two sentence request
-        const firstRequest = { id: id, prevId: prevId, content: beforeContent };
-        const secondRequest = { id: newId, prevId: id, content: afterContent };
+        const firstRequest = { id: id, prevId: prevId, content: beforeContent, order: currentOrder };
+        const secondRequest = { id: newId, prevId: id, content: afterContent, order: newOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line
@@ -1032,14 +1106,16 @@
                     prevId: firstRequest.prevId,
                     rootDocumentId: currentDocumentId,
                     content: firstRequest.content,
-                    sessionId: sessionId
+                    sessionId: sessionId,
+                    order: firstRequest.order
                 },
                 secondRequest: {
                     id: secondRequest.id,
                     prevId: secondRequest.prevId,
                     rootDocumentId: currentDocumentId,
                     content: secondRequest.content,
-                    sessionId: sessionId
+                    sessionId: sessionId,
+                    order: secondRequest.order
                 }
             };
 

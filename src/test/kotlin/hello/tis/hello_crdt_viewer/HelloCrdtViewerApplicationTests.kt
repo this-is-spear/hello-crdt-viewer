@@ -11,5 +11,4 @@ class HelloCrdtViewerApplicationTests {
     @Test
     fun contextLoads() {
     }
-
 }

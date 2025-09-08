@@ -6,4 +6,5 @@ data class SentenceRequest(
     val rootDocumentId: String,
     val content: String,
     val sessionId: String,
+    val order: String,
 )

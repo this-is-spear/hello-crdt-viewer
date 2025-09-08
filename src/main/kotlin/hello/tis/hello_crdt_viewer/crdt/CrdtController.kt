@@ -22,6 +22,7 @@ class CrdtController(
             rootDocumentId = twoSentenceRequest.firstRequest.rootDocumentId,
             content = twoSentenceRequest.firstRequest.content,
             sequence = firstDocumentSequence,
+            order = twoSentenceRequest.firstRequest.order,
         )
 
         val firstProcessedSentenceResponse = SentenceResponse(
@@ -31,6 +32,7 @@ class CrdtController(
             content = twoSentenceRequest.firstRequest.content,
             sequence = firstProcessedSentence.sequence,
             sessionId = twoSentenceRequest.firstRequest.sessionId,
+            order = twoSentenceRequest.firstRequest.order,
         )
 
         // Process second sentence
@@ -41,6 +43,7 @@ class CrdtController(
             rootDocumentId = twoSentenceRequest.secondRequest.rootDocumentId,
             content = twoSentenceRequest.secondRequest.content,
             sequence = secondDocumentSequence,
+            order = twoSentenceRequest.secondRequest.order,
         )
 
         val secondProcessedSentenceResponse = SentenceResponse(
@@ -50,6 +53,7 @@ class CrdtController(
             content = twoSentenceRequest.secondRequest.content,
             sequence = secondProcessedSentence.sequence,
             sessionId = twoSentenceRequest.secondRequest.sessionId,
+            order = twoSentenceRequest.secondRequest.order,
         )
 
         // Create TwoSentenceResponse and send as a single unit
