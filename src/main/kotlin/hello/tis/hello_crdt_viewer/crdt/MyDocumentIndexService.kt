@@ -19,11 +19,11 @@ class MyDocumentIndexService(
                 ?: myDocumentIndexRepository.save(MyDocumentIndex(sentence.rootDocumentId))
 
             if (!myDocumentIndex.fractionIndex.contains(sentence.order)) {
-                MyDocumentIndex(
+                val newMyDocumentIndex = MyDocumentIndex(
                     id = myDocumentIndex.id,
-                    fractionIndex = myDocumentIndex.fractionIndex + sentence.order
+                    fractionIndex = (myDocumentIndex.fractionIndex + sentence.order).sorted()
                 )
-
+                myDocumentIndexRepository.save(newMyDocumentIndex)
                 sentence
             } else {
                 val indexOf = myDocumentIndex.fractionIndex.indexOf(sentence.order)
@@ -37,10 +37,11 @@ class MyDocumentIndexService(
                         sentence.order
                     )
                 }
-                MyDocumentIndex(
+                val newMyDocumentIndex = MyDocumentIndex(
                     id = myDocumentIndex.id,
-                    fractionIndex = myDocumentIndex.fractionIndex + fractionalIndex
+                    fractionIndex = (myDocumentIndex.fractionIndex + fractionalIndex).sorted()
                 )
+                myDocumentIndexRepository.save(newMyDocumentIndex)
 
                 Sentence(
                     id = sentence.id,
