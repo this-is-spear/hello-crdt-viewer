@@ -16,3 +16,4 @@ GET http://localhost:80
 ## 정리한 내용
 
 - [이슈 1 : 문장 간 순서 유지하기](https://github.com/this-is-spear/hello-crdt-viewer/issues/1)
+- [이슈 2 : 문서 처음 접근시 갱신 알림 누락되는 문제 해결](https://github.com/this-is-spear/hello-crdt-viewer/issues/2)
