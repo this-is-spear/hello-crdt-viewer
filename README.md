@@ -12,3 +12,7 @@
 ```http request
 GET http://localhost:80
 ```
+
+## 정리한 내용
+
+- [이슈 1 : 문장 간 순서 유지하기](https://github.com/this-is-spear/hello-crdt-viewer/issues/1)
