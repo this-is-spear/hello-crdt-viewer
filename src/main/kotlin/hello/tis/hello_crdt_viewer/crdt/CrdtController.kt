@@ -9,6 +9,7 @@ import org.springframework.stereotype.Controller
 @Controller
 class CrdtController(
     private val sequenceCreator: SequenceCreator,
+    private val myDocumentIndexService: MyDocumentIndexService,
     private val reliableRedissonSentencePublisher: ReliableRedissonSentencePublisher,
     private val redisMessageProducer: RedisMessageProducer,
     private val reliableRedissonSentenceSubscriber: ReliableRedissonSentenceSubscriber,
@@ -16,44 +17,42 @@ class CrdtController(
     @MessageMapping("/sentence/publish/two")
     fun publishTwoSentences(@Payload twoSentenceRequest: TwoSentenceRequest) {
         val firstDocumentSequence = sequenceCreator.getNowTime()
-        val firstProcessedSentence = Sentence(
+        val firstProcessedSentence = myDocumentIndexService.updateKeyAndSyncMyDocumentIndex(Sentence(
             id = twoSentenceRequest.firstRequest.id,
             prevId = twoSentenceRequest.firstRequest.prevId,
             rootDocumentId = twoSentenceRequest.firstRequest.rootDocumentId,
             content = twoSentenceRequest.firstRequest.content,
             sequence = firstDocumentSequence,
             order = twoSentenceRequest.firstRequest.order,
-        )
+        ))
 
         val firstProcessedSentenceResponse = SentenceResponse(
-            id = twoSentenceRequest.firstRequest.id,
-            prevId = twoSentenceRequest.firstRequest.prevId,
-            rootDocumentId = twoSentenceRequest.firstRequest.rootDocumentId,
-            content = twoSentenceRequest.firstRequest.content,
+            id = firstProcessedSentence.id,
+            prevId = firstProcessedSentence.prevId,
+            rootDocumentId = firstProcessedSentence.rootDocumentId,
+            content = firstProcessedSentence.content,
             sequence = firstProcessedSentence.sequence,
-            sessionId = twoSentenceRequest.firstRequest.sessionId,
-            order = twoSentenceRequest.firstRequest.order,
+            order = firstProcessedSentence.order,
         )
 
         // Process second sentence
         val secondDocumentSequence = sequenceCreator.getNowTime()
-        val secondProcessedSentence = Sentence(
+        val secondProcessedSentence = myDocumentIndexService.updateKeyAndSyncMyDocumentIndex (Sentence(
             id = twoSentenceRequest.secondRequest.id,
             prevId = twoSentenceRequest.secondRequest.prevId,
             rootDocumentId = twoSentenceRequest.secondRequest.rootDocumentId,
             content = twoSentenceRequest.secondRequest.content,
             sequence = secondDocumentSequence,
             order = twoSentenceRequest.secondRequest.order,
-        )
+        ))
 
         val secondProcessedSentenceResponse = SentenceResponse(
-            id = twoSentenceRequest.secondRequest.id,
-            prevId = twoSentenceRequest.secondRequest.prevId,
-            rootDocumentId = twoSentenceRequest.secondRequest.rootDocumentId,
-            content = twoSentenceRequest.secondRequest.content,
+            id = secondProcessedSentence.id,
+            prevId = secondProcessedSentence.prevId,
+            rootDocumentId = secondProcessedSentence.rootDocumentId,
+            content = secondProcessedSentence.content,
             sequence = secondProcessedSentence.sequence,
-            sessionId = twoSentenceRequest.secondRequest.sessionId,
-            order = twoSentenceRequest.secondRequest.order,
+            order = secondProcessedSentence.order,
         )
 
         // Create TwoSentenceResponse and send as a single unit

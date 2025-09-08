@@ -302,8 +302,7 @@
 
         <div class="status">
             연결 상태: <span id="connectionStatus" class="disconnected">연결 안됨</span> |
-            현재 문서: <span id="currentDocument">없음</span> |
-            세션 ID: <span id="sessionId"></span>
+            현재 문서: <span id="currentDocument">없음</span>
         </div>
     </div>
 
@@ -350,7 +349,6 @@
     }
     let stompClient = null;
     let currentDocumentId = null;
-    let sessionId = generateSessionId();
     let sentenceCounter = 0;
     
     // Sentence operation queue using linked list
@@ -404,11 +402,6 @@
     let sentenceQueue = new SentenceOperationQueue();
     let isProcessing = false;
 
-    document.getElementById('sessionId').textContent = sessionId;
-
-    function generateSessionId() {
-        return 'session-' + Math.random().toString(36).substr(2, 9);
-    }
 
     function generateSentenceId() {
         return 'sentence-' + Date.now() + '-' + (++sentenceCounter);
@@ -604,11 +597,6 @@
     }
 
     function handleIncomingSentence(sentenceResponse) {
-        // 자신이 보낸 메시지는 제외
-        if (sentenceResponse.sessionId === sessionId) {
-            return;
-        }
-
         console.log('Received sentence:', sentenceResponse);
 
         // 모든 sentence operation을 연결리스트 큐에 추가
@@ -1106,7 +1094,6 @@
                     prevId: firstRequest.prevId,
                     rootDocumentId: currentDocumentId,
                     content: firstRequest.content,
-                    sessionId: sessionId,
                     order: firstRequest.order
                 },
                 secondRequest: {
@@ -1114,7 +1101,6 @@
                     prevId: secondRequest.prevId,
                     rootDocumentId: currentDocumentId,
                     content: secondRequest.content,
-                    sessionId: sessionId,
                     order: secondRequest.order
                 }
             };

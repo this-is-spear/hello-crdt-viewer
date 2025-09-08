@@ -187,8 +187,7 @@
 
     <div class="status">
         연결 상태: <span id="connectionStatus" class="disconnected">연결 안됨</span> |
-        현재 문서: <span id="currentDocument">없음</span> |
-        세션 ID: <span id="sessionId"></span>
+        현재 문서: <span id="currentDocument">없음</span>
     </div>
 
     <!-- Screen reader announcements -->
@@ -198,14 +197,7 @@
 <script>
     let stompClient = null;
     let currentDocumentId = null;
-    let sessionId = generateSessionId();
     let sentenceCounter = 0;
-
-    document.getElementById('sessionId').textContent = sessionId;
-
-    function generateSessionId() {
-        return 'session-' + Math.random().toString(36).substr(2, 9);
-    }
 
     function generateSentenceId() {
         return 'sentence-' + Date.now() + '-' + (++sentenceCounter);
@@ -244,11 +236,6 @@
     }
 
     function handleIncomingSentence(sentenceResponse) {
-        // 자신이 보낸 메시지는 제외
-        if (sentenceResponse.sessionId === sessionId) {
-            return;
-        }
-
         console.log('Received sentence:', sentenceResponse);
 
         // 문서에 새 문장 추가 또는 업데이트
@@ -799,15 +786,13 @@
                     id: firstRequest.id,
                     prevId: firstRequest.prevId,
                     rootDocumentId: currentDocumentId,
-                    content: firstRequest.content,
-                    sessionId: sessionId
+                    content: firstRequest.content
                 },
                 secondRequest: {
                     id: secondRequest.id,
                     prevId: secondRequest.prevId,
                     rootDocumentId: currentDocumentId,
-                    content: secondRequest.content,
-                    sessionId: sessionId
+                    content: secondRequest.content
                 }
             };
 
@@ -878,8 +863,7 @@
                 id: id,
                 prevId: prevId,
                 rootDocumentId: currentDocumentId,
-                content: content,
-                sessionId: sessionId
+                content: content
             };
 
             stompClient.send('/app/sentence/publish', {}, JSON.stringify(sentenceRequest));

@@ -21,6 +21,7 @@ repositories {
 }
 
 dependencies {
+	implementation("com.davidarvelo:fractional-indexing:3.2.2")
 	implementation("org.redisson:redisson-spring-boot-starter:3.50.0")
 	implementation("com.github.f4b6a3:ulid-creator:5.2.3")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")

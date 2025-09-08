@@ -9,6 +9,5 @@ data class SentenceResponse @JsonCreator constructor(
     @JsonProperty("rootDocumentId") val rootDocumentId: String,
     @JsonProperty("content") val content: String,
     @JsonProperty("sequence") val sequence: Long,
-    @JsonProperty("sessionId") val sessionId: String,
     @JsonProperty("order") val order: String,
 )
