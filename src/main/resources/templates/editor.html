@@ -431,8 +431,45 @@
             }
         }
 
-        // Generate new order key between prev and next
-        return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
+        // Validate and sanitize order values for fractional indexing library
+        function isValidFractionalIndexKey(key) {
+            if (!key) return true; // null is valid
+            // Check if key follows fractional indexing format (base-62 characters)
+            return /^[a-zA-Z0-9]+$/.test(key) && !/^\d+/.test(key); // Should not start with digit
+        }
+
+        // Sanitize order keys - if they're not valid fractional index format, treat them as null
+        if (prevOrder && !isValidFractionalIndexKey(prevOrder)) {
+            console.warn('Invalid prevOrder format, treating as null:', prevOrder);
+            prevOrder = null;
+        }
+        if (nextOrder && !isValidFractionalIndexKey(nextOrder)) {
+            console.warn('Invalid nextOrder format, treating as null:', nextOrder);
+            nextOrder = null;
+        }
+
+        // Validate order sequence
+        if (prevOrder && nextOrder && prevOrder >= nextOrder) {
+            console.warn('Invalid order sequence detected:', { prevOrder, nextOrder });
+            // Reset to null to generate fresh fractional index
+            prevOrder = null;
+            nextOrder = null;
+        }
+
+        try {
+            // Generate new order key between prev and next
+            return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
+        } catch (error) {
+            console.error('Fractional indexing error:', error, { prevOrder, nextOrder });
+            try {
+                // Try again with null values to generate a fresh key
+                return window.FractionalIndexing.generateKeyBetween(null, null);
+            } catch (fallbackError) {
+                console.error('Fallback fractional indexing also failed:', fallbackError);
+                // Final fallback to a simple base-62 string
+                return 'a' + Math.random().toString(36).substr(2, 8);
+            }
+        }
     }
 
     // URL에서 문서 ID 추출
