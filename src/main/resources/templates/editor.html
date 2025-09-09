@@ -431,45 +431,7 @@
             }
         }
 
-        // Validate and sanitize order values for fractional indexing library
-        function isValidFractionalIndexKey(key) {
-            if (!key) return true; // null is valid
-            // Check if key follows fractional indexing format (base-62 characters)
-            return /^[a-zA-Z0-9]+$/.test(key) && !/^\d+/.test(key); // Should not start with digit
-        }
-
-        // Sanitize order keys - if they're not valid fractional index format, treat them as null
-        if (prevOrder && !isValidFractionalIndexKey(prevOrder)) {
-            console.warn('Invalid prevOrder format, treating as null:', prevOrder);
-            prevOrder = null;
-        }
-        if (nextOrder && !isValidFractionalIndexKey(nextOrder)) {
-            console.warn('Invalid nextOrder format, treating as null:', nextOrder);
-            nextOrder = null;
-        }
-
-        // Validate order sequence
-        if (prevOrder && nextOrder && prevOrder >= nextOrder) {
-            console.warn('Invalid order sequence detected:', { prevOrder, nextOrder });
-            // Reset to null to generate fresh fractional index
-            prevOrder = null;
-            nextOrder = null;
-        }
-
-        try {
-            // Generate new order key between prev and next
-            return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
-        } catch (error) {
-            console.error('Fractional indexing error:', error, { prevOrder, nextOrder });
-            try {
-                // Try again with null values to generate a fresh key
-                return window.FractionalIndexing.generateKeyBetween(null, null);
-            } catch (fallbackError) {
-                console.error('Fallback fractional indexing also failed:', fallbackError);
-                // Final fallback to a simple base-62 string
-                return 'a' + Math.random().toString(36).substr(2, 8);
-            }
-        }
+        return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
     }
 
     // URL에서 문서 ID 추출
@@ -1039,8 +1001,13 @@
         
         // Generate order for new sentence (between prevId and current sentence)
         const currentOrder = element.getAttribute('data-order');
-        const newOrder = generateOrderKey(prevId, id);
-        const currentNewOrder = generateOrderKey(newId, null); // Update current sentence order
+        const newOrder = generateOrderKey(prevId, currentOrder);
+        
+        // Find next sibling to properly update current sentence order
+        const wrapperElement = element.closest('.sentence-wrapper');
+        const nextSibling = wrapperElement.nextElementSibling;
+        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
+        const currentNewOrder = generateOrderKey(newId, nextId);
         
         const newWrapper = createSentenceWrapper(newId, prevId, '', newOrder);
 
@@ -1049,8 +1016,7 @@
         element.setAttribute('data-order', currentNewOrder);
 
         // Insert new sentence above current
-        const currentWrapper = element.closest('.sentence-wrapper');
-        currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper);
+        wrapperElement.parentNode.insertBefore(newWrapper, wrapperElement);
 
         // Send two sentence request
         const firstRequest = { id: newId, prevId: prevId, content: '', order: newOrder };
