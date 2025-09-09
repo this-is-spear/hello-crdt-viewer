@@ -995,32 +995,92 @@
         }
     }
 
-    function handleEnterAtBeginning(element, content, id, prevId) {
-        // Create blank line above
-        const newId = generateSentenceId();
-        
-        // Generate order for new sentence (between prevId and current sentence)
-        const currentOrder = element.getAttribute('data-order');
-        const newOrder = generateOrderKey(prevId, currentOrder);
-        
-        // Find next sibling to properly update current sentence order
+    // Helper function to get surrounding sentence information
+    function getSurroundingSentences(element) {
         const wrapperElement = element.closest('.sentence-wrapper');
+        const prevSibling = wrapperElement.previousElementSibling;
         const nextSibling = wrapperElement.nextElementSibling;
-        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
-        const currentNewOrder = generateOrderKey(newId, nextId);
         
-        const newWrapper = createSentenceWrapper(newId, prevId, '', newOrder);
+        const prevSentence = prevSibling ? prevSibling.querySelector('.sentence-line') : null;
+        const nextSentence = nextSibling ? nextSibling.querySelector('.sentence-line') : null;
+        
+        return {
+            prev: prevSentence ? {
+                id: prevSentence.getAttribute('data-id'),
+                order: prevSentence.getAttribute('data-order')
+            } : null,
+            next: nextSentence ? {
+                id: nextSentence.getAttribute('data-id'), 
+                order: nextSentence.getAttribute('data-order')
+            } : null
+        };
+    }
+
+    // Helper function to generate order based on surrounding sentences
+    function generateOrderBySurrounding(prevOrder, nextOrder) {
+        return window.FractionalIndexing.generateKeyBetween(prevOrder, nextOrder);
+    }
+
+    function handleEnterAtBeginning(element, content, id, prevId) {
+        // Create blank line above (상단)
+        const newId = generateSentenceId();
+        const currentOrder = element.getAttribute('data-order');
+        const surrounding = getSurroundingSentences(element);
+        
+        let upperOrder, lowerOrder;
+        
+        // Check if upper sentence has order info
+        if (!currentOrder) {
+            // 상단 sentence에 order 정보가 없는 경우
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                upperOrder = generateOrderBySurrounding(null, null); // mid(null, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, null); // mid(위, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(null, surrounding.next.order); // mid(null, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, surrounding.next.order); // mid(위, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        } else {
+            // 상단 sentence에 order 정보가 있는 경우
+            upperOrder = currentOrder; // 상단 sentence order 유지
+            
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        }
+        
+        const newWrapper = createSentenceWrapper(newId, prevId, '', upperOrder);
 
         // Update current sentence's prevId to new sentence ID and update order
         element.setAttribute('data-prev-id', newId);
-        element.setAttribute('data-order', currentNewOrder);
+        element.setAttribute('data-order', lowerOrder);
 
         // Insert new sentence above current
+        const wrapperElement = element.closest('.sentence-wrapper');
         wrapperElement.parentNode.insertBefore(newWrapper, wrapperElement);
 
         // Send two sentence request
-        const firstRequest = { id: newId, prevId: prevId, content: '', order: newOrder };
-        const secondRequest = { id: id, prevId: newId, content: content, order: currentNewOrder };
+        const firstRequest = { id: newId, prevId: prevId, content: '', order: upperOrder };
+        const secondRequest = { id: id, prevId: newId, content: content, order: lowerOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line (current line)
@@ -1039,24 +1099,66 @@
     }
 
     function handleEnterAtEnd(element, content, id, prevId) {
-        // Save current content and create blank line below
+        // Save current content and create blank line below (하단)
         const newId = generateSentenceId();
-        
-        // Generate order for new sentence (after current sentence)
         const currentOrder = element.getAttribute('data-order');
-        const nextSibling = element.closest('.sentence-wrapper').nextElementSibling;
-        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
-        const newOrder = generateOrderKey(id, nextId);
+        const surrounding = getSurroundingSentences(element);
         
-        const newWrapper = createSentenceWrapper(newId, id, '', newOrder);
+        let upperOrder, lowerOrder;
+        
+        // Check if upper sentence has order info
+        if (!currentOrder) {
+            // 상단 sentence에 order 정보가 없는 경우
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                upperOrder = generateOrderBySurrounding(null, null); // mid(null, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, null); // mid(위, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(null, surrounding.next.order); // mid(null, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, surrounding.next.order); // mid(위, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        } else {
+            // 상단 sentence에 order 정보가 있는 경우
+            upperOrder = currentOrder; // 상단 sentence order 유지
+            
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        }
+        
+        const newWrapper = createSentenceWrapper(newId, id, '', lowerOrder);
+
+        // Update current sentence order if it was null
+        if (!currentOrder) {
+            element.setAttribute('data-order', upperOrder);
+        }
 
         // Insert new sentence below current
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
         // Send two sentence request
-        const firstRequest = { id: id, prevId: prevId, content: content, order: currentOrder };
-        const secondRequest = { id: newId, prevId: id, content: '', order: newOrder };
+        const firstRequest = { id: id, prevId: prevId, content: content, order: upperOrder };
+        const secondRequest = { id: newId, prevId: id, content: '', order: lowerOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line
@@ -1081,22 +1183,64 @@
         const afterContent = content.substring(cursorPosition);
 
         const newId = generateSentenceId();
-        
-        // Generate order for new sentence (after current sentence)
         const currentOrder = element.getAttribute('data-order');
-        const nextSibling = element.closest('.sentence-wrapper').nextElementSibling;
-        const nextId = nextSibling ? nextSibling.querySelector('.sentence-line').getAttribute('data-id') : null;
-        const newOrder = generateOrderKey(id, nextId);
+        const surrounding = getSurroundingSentences(element);
         
-        const newWrapper = createSentenceWrapper(newId, id, afterContent, newOrder);
+        let upperOrder, lowerOrder;
+        
+        // Check if upper sentence has order info
+        if (!currentOrder) {
+            // 상단 sentence에 order 정보가 없는 경우
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                upperOrder = generateOrderBySurrounding(null, null); // mid(null, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, null); // mid(위, null)
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(null, surrounding.next.order); // mid(null, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                upperOrder = generateOrderBySurrounding(surrounding.prev.order, surrounding.next.order); // mid(위, 아래)
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        } else {
+            // 상단 sentence에 order 정보가 있는 경우
+            upperOrder = currentOrder; // 상단 sentence order 유지
+            
+            if (!surrounding.prev && !surrounding.next) {
+                // 위-아래 기존 sentence가 없는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (surrounding.prev && !surrounding.next) {
+                // 위에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, null); // mid(상단, null)
+            } else if (!surrounding.prev && surrounding.next) {
+                // 아래에만 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            } else {
+                // 위-아래 기존 sentence가 있는 경우
+                lowerOrder = generateOrderBySurrounding(upperOrder, surrounding.next.order); // mid(상단, 아래)
+            }
+        }
+        
+        const newWrapper = createSentenceWrapper(newId, id, afterContent, lowerOrder);
+
+        // Update current sentence order if it was null
+        if (!currentOrder) {
+            element.setAttribute('data-order', upperOrder);
+        }
 
         // Insert new sentence below current
         const currentWrapper = element.closest('.sentence-wrapper');
         currentWrapper.parentNode.insertBefore(newWrapper, currentWrapper.nextSibling);
 
         // Send two sentence request
-        const firstRequest = { id: id, prevId: prevId, content: beforeContent, order: currentOrder };
-        const secondRequest = { id: newId, prevId: id, content: afterContent, order: newOrder };
+        const firstRequest = { id: id, prevId: prevId, content: beforeContent, order: upperOrder };
+        const secondRequest = { id: newId, prevId: id, content: afterContent, order: lowerOrder };
 
         sendTwoSentenceUpdate(firstRequest, secondRequest, () => {
             // Move cursor to beginning of next line
