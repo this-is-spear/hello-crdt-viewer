@@ -1260,32 +1260,60 @@
     }
 
     function sendTwoSentenceUpdate(firstRequest, secondRequest, callback) {
-        if (stompClient && stompClient.connected && currentDocumentId) {
-            const twoSentenceRequest = {
-                firstRequest: {
-                    id: firstRequest.id,
-                    prevId: firstRequest.prevId,
-                    rootDocumentId: currentDocumentId,
-                    content: firstRequest.content,
-                    order: firstRequest.order
-                },
-                secondRequest: {
-                    id: secondRequest.id,
-                    prevId: secondRequest.prevId,
-                    rootDocumentId: currentDocumentId,
-                    content: secondRequest.content,
-                    order: secondRequest.order
-                }
-            };
+        sendTwoSentenceUpdateWithRetry(firstRequest, secondRequest, callback, 3);
+    }
 
+    function sendTwoSentenceUpdateWithRetry(firstRequest, secondRequest, callback, maxAttempts, currentAttempt = 1) {
+        if (!stompClient || !stompClient.connected || !currentDocumentId) {
+            console.warn('WebSocket not connected, retrying in 1 second... (attempt ' + currentAttempt + '/' + maxAttempts + ')');
+            if (currentAttempt < maxAttempts) {
+                setTimeout(() => {
+                    sendTwoSentenceUpdateWithRetry(firstRequest, secondRequest, callback, maxAttempts, currentAttempt + 1);
+                }, 1000 * currentAttempt); // Exponential backoff: 1s, 2s, 3s
+            } else {
+                showToast('메시지 전송에 실패했습니다. 모든 재시도가 실패했습니다.', 'error');
+                if (callback) callback();
+            }
+            return;
+        }
+
+        const twoSentenceRequest = {
+            firstRequest: {
+                id: firstRequest.id,
+                prevId: firstRequest.prevId,
+                rootDocumentId: currentDocumentId,
+                content: firstRequest.content,
+                order: firstRequest.order
+            },
+            secondRequest: {
+                id: secondRequest.id,
+                prevId: secondRequest.prevId,
+                rootDocumentId: currentDocumentId,
+                content: secondRequest.content,
+                order: secondRequest.order
+            }
+        };
+
+        try {
             stompClient.send('/app/sentence/publish/two', {}, JSON.stringify(twoSentenceRequest));
-
+            console.log('Message sent successfully on attempt ' + currentAttempt);
+            
             // Execute callback after a short delay
             if (callback) {
                 setTimeout(callback, 50);
             }
-        } else if (callback) {
-            callback();
+        } catch (error) {
+            console.error('Failed to send message on attempt ' + currentAttempt + ':', error);
+            
+            if (currentAttempt < maxAttempts) {
+                showToast('메시지 전송 실패, ' + (1000 * currentAttempt / 1000) + '초 후 재시도합니다... (' + currentAttempt + '/' + maxAttempts + ')', 'warning');
+                setTimeout(() => {
+                    sendTwoSentenceUpdateWithRetry(firstRequest, secondRequest, callback, maxAttempts, currentAttempt + 1);
+                }, 1000 * currentAttempt); // Exponential backoff: 1s, 2s, 3s
+            } else {
+                showToast('메시지 전송에 실패했습니다. 모든 재시도가 실패했습니다.', 'error');
+                if (callback) callback();
+            }
         }
     }
 
