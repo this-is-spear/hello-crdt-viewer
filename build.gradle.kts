@@ -21,6 +21,8 @@ repositories {
 }
 
 dependencies {
+	implementation("org.springframework.retry:spring-retry")
+	implementation("org.springframework:spring-aspects")
 	implementation("com.davidarvelo:fractional-indexing:3.2.2")
 	implementation("org.redisson:redisson-spring-boot-starter:3.50.0")
 	implementation("com.github.f4b6a3:ulid-creator:5.2.3")

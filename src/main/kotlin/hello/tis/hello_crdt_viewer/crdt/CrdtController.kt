@@ -35,7 +35,6 @@ class CrdtController(
             order = firstProcessedSentence.order,
         )
 
-        // Process second sentence
         val secondDocumentSequence = sequenceCreator.getNowTime()
         val secondProcessedSentence = myDocumentIndexService.updateKeyAndSyncMyDocumentIndex (Sentence(
             id = twoSentenceRequest.secondRequest.id,

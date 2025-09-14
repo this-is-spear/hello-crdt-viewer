@@ -23,7 +23,7 @@ class ReliableRedissonSentenceSubscriber(
         }
 
         try {
-            val topic = redissonClient.getTopic("document.$documentId")
+            val topic = redissonClient.getReliableTopic("document.$documentId")
             topic.addListener(String::class.java) { channel, sentence ->
                 try {
                     val twoSentenceResponse = objectMapper.readValue(sentence, TwoSentenceResponse::class.java)

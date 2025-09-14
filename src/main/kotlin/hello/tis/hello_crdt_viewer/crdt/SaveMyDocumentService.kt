@@ -71,7 +71,6 @@ class SaveMyDocumentService(
                     lastUpdateSequence = sentence.sequence
                 )
             } else {
-                // create
                 MyDocument(
                     id = sentence.rootDocumentId,
                     title = sentence.rootDocumentId,
