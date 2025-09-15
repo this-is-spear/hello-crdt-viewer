@@ -1,4 +1,4 @@
-package hello.tis.hello_crdt_viewer.crdt
+package hello.tis.hello_crdt_viewer.crdt.controller
 
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty

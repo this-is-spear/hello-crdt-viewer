@@ -1,6 +1,7 @@
-package hello.tis.hello_crdt_viewer.docs
+package hello.tis.hello_crdt_viewer.docs.service
 
 import hello.tis.hello_crdt_viewer.domain.MyDocument
+import hello.tis.hello_crdt_viewer.domain.MyDocumentMetadata
 import hello.tis.hello_crdt_viewer.domain.SequenceCreator
 import hello.tis.hello_crdt_viewer.repository.MyDocumentRepository
 import java.util.UUID
@@ -14,7 +15,7 @@ class MyDocumentService(
 ) {
     fun readDocument(id: String): MyDocument? {
         val document = myDocumentRepository.findByIdOrNull(id)
-        return document?.let { 
+        return document?.let {
             MyDocument(
                 id = it.id,
                 title = it.title,

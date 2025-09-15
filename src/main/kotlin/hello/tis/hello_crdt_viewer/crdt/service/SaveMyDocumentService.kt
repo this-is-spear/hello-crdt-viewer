@@ -1,7 +1,10 @@
-package hello.tis.hello_crdt_viewer.crdt
+package hello.tis.hello_crdt_viewer.crdt.service
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import hello.tis.hello_crdt_viewer.crdt.redis.RedisMessageProducer
+import hello.tis.hello_crdt_viewer.crdt.controller.SentenceResponse
+import hello.tis.hello_crdt_viewer.crdt.controller.TwoSentenceResponse
 import hello.tis.hello_crdt_viewer.domain.MyDocument
 import hello.tis.hello_crdt_viewer.domain.Sentence
 import hello.tis.hello_crdt_viewer.repository.MyDocumentRepository
@@ -23,7 +26,7 @@ class SaveMyDocumentService(
     @Scheduled(fixedDelay = 100)
     fun processPendingDocuments() {
         try {
-            val queue = redissonClient.getDeque<String>(RedisMessageProducer.DOCUMENT_LIST_KEY)
+            val queue = redissonClient.getDeque<String>(RedisMessageProducer.Companion.DOCUMENT_LIST_KEY)
             val pendingSentences = mutableListOf<SentenceResponse>()
             val messages = queue.pollLast(1000)
             messages.forEach { message ->

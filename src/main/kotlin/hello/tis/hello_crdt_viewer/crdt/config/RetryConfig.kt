@@ -1,4 +1,4 @@
-package hello.tis.hello_crdt_viewer.config
+package hello.tis.hello_crdt_viewer.crdt.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

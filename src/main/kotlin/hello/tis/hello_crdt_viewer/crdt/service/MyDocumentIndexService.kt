@@ -1,6 +1,7 @@
-package hello.tis.hello_crdt_viewer.crdt
+package hello.tis.hello_crdt_viewer.crdt.service
 
 import com.davidarvelo.fractionalindexing.FractionalIndexing
+import hello.tis.hello_crdt_viewer.crdt.service.Locker
 import hello.tis.hello_crdt_viewer.domain.MyDocumentIndex
 import hello.tis.hello_crdt_viewer.domain.Sentence
 import hello.tis.hello_crdt_viewer.repository.MyDocumentIndexRepository

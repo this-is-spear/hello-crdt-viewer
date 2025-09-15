@@ -1,6 +1,7 @@
-package hello.tis.hello_crdt_viewer.crdt
+package hello.tis.hello_crdt_viewer.crdt.redis
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import hello.tis.hello_crdt_viewer.crdt.controller.TwoSentenceResponse
 import org.redisson.api.RedissonClient
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

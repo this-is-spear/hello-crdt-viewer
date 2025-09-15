@@ -1,5 +1,7 @@
-package hello.tis.hello_crdt_viewer.docs
+package hello.tis.hello_crdt_viewer.docs.controller
 
+import hello.tis.hello_crdt_viewer.domain.MyDocumentMetadata
+import hello.tis.hello_crdt_viewer.docs.service.MyDocumentService
 import hello.tis.hello_crdt_viewer.domain.MyDocument
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable

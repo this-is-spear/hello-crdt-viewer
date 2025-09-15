@@ -1,5 +1,6 @@
-package hello.tis.hello_crdt_viewer.crdt
+package hello.tis.hello_crdt_viewer.crdt.redis
 
+import hello.tis.hello_crdt_viewer.crdt.service.Locker
 import java.util.concurrent.TimeUnit
 import org.redisson.api.RedissonClient
 import org.slf4j.Logger
@@ -7,12 +8,12 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 @Component
-class Locker(
+class RedissonLocker(
     private val redissonClient: RedissonClient,
-) {
+) : Locker {
     private val log: Logger = LoggerFactory.getLogger(this::class.java)
 
-    fun <T> lock(lockName: String, function: () -> T): T {
+    override fun <T> lock(lockName: String, function: () -> T): T {
         val threadId = Thread.currentThread().id
         val lock = redissonClient.getLock(lockName)
         try {

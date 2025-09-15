@@ -1,4 +1,4 @@
-package hello.tis.hello_crdt_viewer.docs
+package hello.tis.hello_crdt_viewer.domain
 
 data class MyDocumentMetadata(
     val id: String,
