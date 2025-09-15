@@ -54,7 +54,6 @@ class CrdtController(
             order = secondProcessedSentence.order,
         )
 
-        // Create TwoSentenceResponse and send as a single unit
         val twoSentenceResponse = TwoSentenceResponse(
             firstResponse = firstProcessedSentenceResponse,
             secondResponse = secondProcessedSentenceResponse
